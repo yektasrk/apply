@@ -11,6 +11,8 @@ import logging
 import config
 import scraper
 import sheets
+import sys
+
 import telegram_bot
 
 logging.basicConfig(
@@ -46,11 +48,25 @@ def build_message(jobs, rows_written: int) -> str:
     return "\n".join(lines)
 
 
+def validate_configs() -> None:
+    missing = []
+    if config.GOOGLE_SHEET_ID in ("", "YOUR_SHEET_ID"):
+        missing.append("GOOGLE_SHEET_ID")
+    if config.TELEGRAM_BOT_TOKEN in ("", "YOUR_BOT_TOKEN"):
+        missing.append("TELEGRAM_BOT_TOKEN")
+    if config.TELEGRAM_CHANNEL_ID in ("", "@your_channel"):
+        missing.append("TELEGRAM_CHANNEL_ID")
+    if missing:
+        print(f"❌ Missing or unconfigured secrets: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--country", required=True, help="Country key from config.COUNTRIES")
     args = parser.parse_args()
     configure_country(args.country)
+    validate_configs()
 
     jobs = scraper.scrape_all_terms()
 

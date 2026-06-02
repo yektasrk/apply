@@ -89,6 +89,16 @@ jobs:
           test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
           printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
 
+      - name: Debug secrets presence
+        env:
+          SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+        run: |
+          if [ -z "$SHEET_ID" ]; then
+            echo "❌ GOOGLE_SHEET_ID secret is empty or not set"
+          else
+            echo "✅ GOOGLE_SHEET_ID is set (length: ${#SHEET_ID})"
+          fi
+
       - name: Scrape ${{ needs.resolve-country.outputs.country }}
         env:
           GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
