@@ -48,7 +48,9 @@ def get_worksheet() -> gspread.Worksheet:
         config.GOOGLE_SERVICE_ACCOUNT_FILE, scopes=scopes
     )
     client = gspread.authorize(creds)
-    sheet = client.open(config.GOOGLE_SHEET_NAME)
+    if not config.GOOGLE_SHEET_ID or config.GOOGLE_SHEET_ID == "YOUR_SHEET_ID":
+        raise RuntimeError("GOOGLE_SHEET_ID is not configured.")
+    sheet = client.open_by_key(config.GOOGLE_SHEET_ID)
     return sheet.worksheet(config.GOOGLE_SHEET_TAB)
 
 

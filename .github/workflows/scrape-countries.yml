@@ -1,4 +1,4 @@
-name: Scrape Countries
+name: Scrape Jobs
 
 on:
   schedule:
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       country:
-        description: Country to scrape
+        description: Country to scrape for jobs
         required: true
         default: denmark
         type: choice
