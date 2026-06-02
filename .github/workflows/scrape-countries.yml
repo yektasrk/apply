@@ -79,8 +79,21 @@ jobs:
           python-version: "3.13"
           cache: pip
 
+      - name: Cache virtualenv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Add venv to PATH
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
 
       - name: Write Google service account
         env:
@@ -88,16 +101,6 @@ jobs:
         run: |
           test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
           printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
-
-      - name: Debug secrets presence
-        env:
-          SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-        run: |
-          if [ -z "$SHEET_ID" ]; then
-            echo "❌ GOOGLE_SHEET_ID secret is empty or not set"
-          else
-            echo "✅ GOOGLE_SHEET_ID is set (length: ${#SHEET_ID})"
-          fi
 
       - name: Scrape ${{ needs.resolve-country.outputs.country }}
         env:
