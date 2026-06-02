@@ -1,0 +1,99 @@
+name: Scrape Countries
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # netherlands
+    - cron: "0 2 * * *"   # germany
+    - cron: "0 4 * * *"   # uk
+    - cron: "0 6 * * *"   # denmark
+    - cron: "0 8 * * *"   # ireland
+    - cron: "0 10 * * *"  # sweden
+    - cron: "0 12 * * *"  # switzerland
+    - cron: "0 14 * * *"  # portugal
+    - cron: "0 16 * * *"  # france
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Country to scrape
+        required: true
+        default: denmark
+        type: choice
+        options:
+          - netherlands
+          - germany
+          - uk
+          - denmark
+          - ireland
+          - sweden
+          - switzerland
+          - portugal
+          - france
+
+concurrency:
+  group: scrape-${{ github.event.schedule || inputs.country }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-country:
+    runs-on: ubuntu-latest
+    outputs:
+      country: ${{ steps.country.outputs.country }}
+    steps:
+      - id: country
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            workflow_dispatch)
+              country="${{ inputs.country }}"
+              ;;
+            schedule)
+              case "${{ github.event.schedule }}" in
+                "0 0 * * *") country="netherlands" ;;
+                "0 2 * * *") country="germany" ;;
+                "0 4 * * *") country="uk" ;;
+                "0 6 * * *") country="denmark" ;;
+                "0 8 * * *") country="ireland" ;;
+                "0 10 * * *") country="sweden" ;;
+                "0 12 * * *") country="switzerland" ;;
+                "0 14 * * *") country="portugal" ;;
+                "0 16 * * *") country="france" ;;
+                *) echo "Unknown schedule: ${{ github.event.schedule }}" >&2; exit 1 ;;
+              esac
+              ;;
+            *)
+              echo "Unsupported event: ${{ github.event_name }}" >&2
+              exit 1
+              ;;
+          esac
+          echo "country=$country" >> "$GITHUB_OUTPUT"
+
+  scrape:
+    needs: resolve-country
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write Google service account
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
+
+      - name: Scrape ${{ needs.resolve-country.outputs.country }}
+        env:
+          GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
+          GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: python main.py --country "${{ needs.resolve-country.outputs.country }}"
