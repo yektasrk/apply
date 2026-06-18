@@ -1,0 +1,4 @@
+interface:
+  display_name: "Submit Job Applications"
+  short_description: "Apply suitable jobs with cover letters"
+  default_prompt: "Use $submit-job-applications to apply for suitable sheet rows that already have cover letters."

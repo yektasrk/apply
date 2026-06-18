@@ -91,6 +91,13 @@ jobs:
           test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
           printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
 
+      - name: Write resume
+        env:
+          RESUME_MD: ${{ secrets.RESUME_MD }}
+        run: |
+          test -n "$RESUME_MD"
+          printf '%s' "$RESUME_MD" > resume.md
+
       - name: Scrape ${{ needs.resolve-country.outputs.country }}
         env:
           GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
@@ -98,4 +105,7 @@ jobs:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-        run: python main.py --country "${{ needs.resolve-country.outputs.country }}"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5-mini' }}
+          AI_MATCHING_REQUIRED: "false"
+        run: python -m job_finder.main --country "${{ needs.resolve-country.outputs.country }}"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Triage Job Applications"
+  short_description: "Classify sheet jobs and draft cover letters"
+  default_prompt: "Use $triage-job-applications to review my job sheet, mark suitable rows, and draft missing cover letters."
