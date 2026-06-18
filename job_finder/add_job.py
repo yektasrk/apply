@@ -1,14 +1,14 @@
 """
 add_job.py — Manually add a single LinkedIn job URL to the Google Sheet
-Usage: python add_job.py https://www.linkedin.com/jobs/view/1234567890
+Usage: python -m job_finder.add_job --country denmark https://www.linkedin.com/jobs/view/1234567890
 """
 
 import argparse
 import logging
 
-import config
-import scraper
-import sheets
+from . import config
+from . import scraper
+from . import sheets
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,22 +1,44 @@
 """
-config.py — Edit everything here before running main.py
+config.py — Edit everything here before running python -m job_finder.main
 """
 
 import os
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_int(name: str, default: int) -> int:
+    return int(os.getenv(name, str(default)))
+
+
+def _env_list(name: str, default: list[str]) -> list[str]:
+    value = os.getenv(name)
+    if not value:
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 
 # ── Per-country config ──────────────────────────────────────────────────────────
 # Each key is the country name you pass via --country
 # Each value overrides: location, sheet tab, and optionally search terms
 #
-# Run:  python main.py --country netherlands
-#       python main.py --country germany
+# Run:  python -m job_finder.main --country netherlands
+#       python -m job_finder.main --country germany
 
-SEARCH_TERMS: list[str] = [
-    '"Site Reliability Engineer"',
-    '"Platform Engineer"',
-    '"DevOps Engineer"',
-    '"Infrastructure Engineer"',
-]
+SEARCH_TERMS: list[str] = _env_list(
+    "SEARCH_TERMS",
+    [
+        '"Site Reliability Engineer"',
+        '"Platform Engineer"',
+        '"DevOps Engineer"',
+        '"Infrastructure Engineer"',
+    ],
+)
 
 COUNTRIES: dict[str, dict] = {
     "netherlands": {
@@ -66,26 +88,30 @@ COUNTRIES: dict[str, dict] = {
     },
 }
 
-# ── Runtime — set by main.py from --country arg, don't edit ────────────────────
+# ── Runtime — set by job_finder.main from --country arg, don't edit ────────────
 LOCATION:   str = ""
 GOOGLE_SHEET_TAB: str = ""
 
 # ── Scrape settings ─────────────────────────────────────────────────────────────
-RESULTS_WANTED    = int(os.getenv("RESULTS_WANTED", "50"))
-HOURS_OLD         = int(os.getenv("HOURS_OLD",      "24"))
-REMOTE_ONLY       = os.getenv("REMOTE_ONLY", "false").lower() == "true"
-JOB_TYPE          = os.getenv("JOB_TYPE", "fulltime")
-FETCH_DESCRIPTION = os.getenv("FETCH_DESCRIPTION", "true").lower() == "true"
+RESULTS_WANTED = _env_int("RESULTS_WANTED", 50)
+HOURS_OLD = _env_int("HOURS_OLD", 720)  # jobs posted within N hours
+REMOTE_ONLY = _env_flag("REMOTE_ONLY", False)
+JOB_TYPE = os.getenv("JOB_TYPE", "fulltime") or None
+FETCH_DESCRIPTION = _env_flag("FETCH_DESCRIPTION", True)
 
-PROXIES: list[str] = [
-    # "user:pass@1.2.3.4:8000",
-]
+PROXIES: list[str] = _env_list("PROXIES", [])
 
-# ── Google Sheets ───────────────────────────────────────────────────────────────
-GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "service_account.json")
-GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "LinkedIn Jobs")
-GOOGLE_SHEET_ID   = os.getenv("GOOGLE_SHEET_ID",   "YOUR_SHEET_ID")
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv(
+    "GOOGLE_SERVICE_ACCOUNT_FILE",
+    "service_account.json",
+)
+GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "")
+GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "")
 
 # ── Telegram ────────────────────────────────────────────────────────────────────
-TELEGRAM_BOT_TOKEN  = os.getenv("TELEGRAM_BOT_TOKEN",  "YOUR_BOT_TOKEN")
-TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "@your_channel")
+# 1. Message @BotFather on Telegram → /newbot → copy the token
+# 2. Add the bot to your channel as an Administrator
+# 3. For a public channel use "@your_channel_name"
+#    For a private channel use the numeric ID e.g. "-1001234567890"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "")

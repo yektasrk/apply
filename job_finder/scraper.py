@@ -6,12 +6,26 @@ import logging
 
 import pandas as pd
 from jobspy import scrape_jobs
-from tenacity import retry, retry_if_exception_type, RetryError
+from jobspy.linkedin import LinkedIn
+from tenacity import retry, retry_if_exception_type
 
-import config
-from retries import RETRY
+from . import config
+from .retries import RETRY
 
 log = logging.getLogger(__name__)
+
+_original_get_job_details = LinkedIn._get_job_details
+
+
+def _get_job_details_with_defaults(self: LinkedIn, job_id: str) -> dict:
+    """Work around JobSpy returning None for optional LinkedIn text fields."""
+    details = _original_get_job_details(self, job_id)
+    if details.get("job_level") is None:
+        details["job_level"] = ""
+    return details
+
+
+LinkedIn._get_job_details = _get_job_details_with_defaults
 
 
 @retry(**RETRY, retry=retry_if_exception_type(Exception))
@@ -24,6 +38,7 @@ def _scrape_one_term(term: str) -> pd.DataFrame:
         hours_old=config.HOURS_OLD,
         is_remote=config.REMOTE_ONLY,
         job_type=config.JOB_TYPE,
+        proxies=config.PROXIES or None,
         linkedin_fetch_description=config.FETCH_DESCRIPTION,
     )
 
@@ -33,6 +48,7 @@ def _scrape_by_id(job_id: str) -> pd.DataFrame:
     return scrape_jobs(
         site_name=["linkedin"],
         linkedin_job_ids=[job_id],
+        proxies=config.PROXIES or None,
         linkedin_fetch_description=True,
     )
 
@@ -49,8 +65,6 @@ def scrape_all_terms() -> pd.DataFrame:
             if not jobs.empty:
                 jobs["search_term"] = term
                 all_jobs.append(jobs)
-        except RetryError as e:
-            log.error("  → All retries failed for '%s': %s", term, e)
         except Exception as e:
             log.error("  → Failed scraping '%s': %s", term, e)
 

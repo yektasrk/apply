@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Evolve"
+  short_description: "Audit and improve a local markdown wiki"
+  default_prompt: "Use $wiki-evolve to health-check the local wiki and propose durable improvements."

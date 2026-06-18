@@ -98,4 +98,4 @@ jobs:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-        run: python main.py --country "${{ needs.resolve-country.outputs.country }}"
+        run: python -m job_finder.main --country "${{ needs.resolve-country.outputs.country }}"

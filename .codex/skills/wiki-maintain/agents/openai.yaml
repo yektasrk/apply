@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Maintain"
+  short_description: "Ingest sources and update a markdown wiki"
+  default_prompt: "Use $wiki-maintain to ingest this source and update the local wiki."
