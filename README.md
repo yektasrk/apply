@@ -1,155 +1,157 @@
-# LinkedIn Job Scraper → Google Sheets + Telegram
+# Apply
 
-Scrapes LinkedIn jobs on a schedule, appends new listings to a Google Sheet,
-and sends a summary message to a Telegram channel.
+Apply is a private job-search automation workspace. It scrapes LinkedIn jobs by
+country, appends deduped rows to Google Sheets, sends a Telegram summary, and
+keeps local-only candidate material out of Git.
 
----
+The tracked Python app lives in `job_finder/`. Personal data such as CVs, raw
+evidence, the maintained wiki, generated cover letters, `.env`, and Google
+service account keys are intentionally ignored.
 
-## 1. Install dependencies
+## Repository Contents
 
-```bash
-pip install -r requirements.txt
+```text
+apply/
+├── job_finder/                 # Python package for scraping and sheet writes
+│   ├── main.py                 # Scheduled scrape entry point
+│   ├── add_job.py              # Add one LinkedIn job URL manually
+│   ├── config.py               # Countries and env-backed runtime settings
+│   ├── scraper.py              # LinkedIn scraping through JobSpy
+│   ├── sheets.py               # Google Sheets dedupe and append logic
+│   ├── telegram_bot.py         # Telegram notification helper
+│   └── retries.py              # Shared retry policy
+├── .github/workflows/          # Scheduled and manual GitHub Actions runs
+├── .codex/skills/              # Project-specific Codex skills
+├── AGENTS.md                   # Workspace rules for Codex/wiki work
+├── serve_wiki.py               # Local wiki preview server
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
----
+Ignored local-only paths include `service_account.json`, `.env`, `resume.md`,
+CV PDFs, `raw/`, `wiki/`, and `cover_letters/`.
 
-## 2. Google Sheets — Service Account setup
+## Setup
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Create a new project (or use an existing one)
-3. Enable **Google Sheets API** and **Google Drive API**
-4. Go to **IAM & Admin → Service Accounts** → Create a Service Account
-5. Under **Keys**, click **Add Key → JSON** — download the file
-6. Rename it to `service_account.json` and place it in this folder. This file is local-only and ignored by Git.
-7. Open your Google Sheet → click **Share** → paste the service account email (looks like `xxx@xxx.iam.gserviceaccount.com`) → give it **Editor** access
-8. Copy `.env.example` to `.env` and set `GOOGLE_SHEET_NAME` to the exact name of your spreadsheet
-9. Copy the Sheet ID from the URL:
-   `https://docs.google.com/spreadsheets/d/**SHEET_ID_HERE**/edit`
+Use Python 3.13 to match GitHub Actions.
 
----
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-## 3. Telegram Bot setup
-
-1. Open Telegram and message **@BotFather**
-2. Send `/newbot` and follow the prompts — copy the **token**
-3. Paste the token into `TELEGRAM_BOT_TOKEN` in `.env` locally or into GitHub Secrets for Actions
-4. Add the bot to your channel as an **Administrator**
-5. Set `TELEGRAM_CHANNEL_ID`:
-   - Public channel: `"@your_channel_name"`
-   - Private channel: numeric ID like `"-1001234567890"`
-     (forward a message from the channel to @userinfobot to get the ID)
-
----
-
-## 4. Configure your search
-
-Search defaults and country metadata live in `job_finder/config.py`. Override search terms and runtime settings with local environment variables:
+Create local configuration:
 
 ```bash
 cp .env.example .env
-# edit .env, then export it before running locally
 set -a
 source .env
 set +a
 ```
 
-> **Tip:** Keep `.env`, `service_account.json`, CV/resume files, PDFs, `raw/`, `wiki/`, and `cover_letters/` local. They are ignored by Git.
+## Google Sheets
 
-Common search overrides:
+1. Create or choose a Google Cloud project.
+2. Enable the Google Sheets API and Google Drive API.
+3. Create a service account and download its JSON key.
+4. Save the key locally as `service_account.json`.
+5. Share the target Google Sheet with the service account email as an editor.
+6. Set `GOOGLE_SHEET_ID` in `.env` from the sheet URL.
+7. Set `GOOGLE_SHEET_NAME` if you want to keep the sheet name documented in env.
+
+The app writes to country-specific tabs defined in `job_finder/config.py`.
+
+## Telegram
+
+1. Create a bot with `@BotFather`.
+2. Add the bot to the target channel as an administrator.
+3. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHANNEL_ID` in `.env`.
+
+For a public channel, `TELEGRAM_CHANNEL_ID` can be `@channel_name`. For a
+private channel, use the numeric channel ID.
+
+## Configuration
+
+The default countries and sheet tabs are in `job_finder/config.py`.
+Runtime settings are environment-backed:
 
 ```bash
-SEARCH_TERMS='"Site Reliability Engineer","Platform Engineer"'
+GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json
+GOOGLE_SHEET_NAME=
+GOOGLE_SHEET_ID=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHANNEL_ID=
+SEARCH_TERMS='"Site Reliability Engineer","Platform Engineer","DevOps Engineer","Infrastructure Engineer"'
 RESULTS_WANTED=50
 HOURS_OLD=720
 REMOTE_ONLY=false
 JOB_TYPE=fulltime
 FETCH_DESCRIPTION=true
-PROXIES=user:pass@1.2.3.4:8000,user:pass@5.6.7.8:8000
+PROXIES=
 ```
 
----
+`SEARCH_TERMS` and `PROXIES` are comma-separated lists. Use `JOB_TYPE=` to pass
+no job type filter.
 
-## 5. Run
+## Run Locally
+
+Scrape one configured country:
 
 ```bash
 python -m job_finder.main --country denmark
 ```
 
----
+Add one LinkedIn job URL manually:
 
-## 6. Automate (optional)
-
-### macOS / Linux — cron (daily at 9 AM)
 ```bash
-crontab -e
-# add:
-0 9 * * * cd /path/to/apply && python -m job_finder.main --country denmark >> scraper.log 2>&1
+python -m job_finder.add_job --country denmark https://www.linkedin.com/jobs/view/1234567890
 ```
 
-### Windows — Task Scheduler
-Create a task that runs `python -m job_finder.main --country denmark` in the project directory.
+Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
+`ireland`, `sweden`, `switzerland`, `portugal`, and `france`.
 
-### GitHub Actions (free cloud runner)
-```yaml
-# .github/workflows/scrape.yml
-name: LinkedIn Scraper
-on:
-  schedule:
-    - cron: "0 9 * * *"   # 9 AM UTC daily
-  workflow_dispatch:        # also allows manual trigger
+## GitHub Actions
 
-jobs:
-  scrape:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -r requirements.txt
-      - run: python -m job_finder.main --country denmark
-        env:
-          SEARCH_TERM: "Python Developer"
-          LOCATION: "United States"
-          GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
-          GOOGLE_SHEET_NAME: "LinkedIn Jobs"
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+The workflow in `.github/workflows/scrape-countries.yml` runs on GitHub-hosted
+Python 3.13 runners. It can be triggered manually with a `country` input, and it
+also runs on this UTC schedule:
+
+```text
+00:00 netherlands
+02:00 germany
+04:00 uk
+06:00 denmark
+08:00 ireland
+10:00 sweden
+12:00 switzerland
+14:00 portugal
+16:00 france
 ```
-Store `service_account.json` contents as a GitHub secret and write it to disk
-in a step before running.
 
----
+Required repository secrets:
 
-## 7. Dealing with LinkedIn rate limits (429 errors)
-
-LinkedIn blocks scrapers aggressively. Recommended mitigations:
-
-- **Add proxies** with `PROXIES=user:pass@1.2.3.4:8000` in your local `.env`
-- **Lower `RESULTS_WANTED`** — stick to ≤50 per run
-- **Increase `HOURS_OLD`** so you're not re-scraping everything
-- **Add a delay** — run once per day, not every few minutes
-- **Use a residential proxy service** (e.g. Bright Data, Oxylabs)
-
----
-
-## File structure
-
+```text
+GOOGLE_SERVICE_ACCOUNT_JSON
+GOOGLE_SHEET_NAME
+GOOGLE_SHEET_ID
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHANNEL_ID
 ```
-apply/
-├── job_finder/
-│   ├── main.py           # Scheduled scrape entry point
-│   ├── add_job.py        # Manual single-job entry point
-│   ├── config.py         # App settings
-│   ├── scraper.py        # LinkedIn scraping
-│   ├── sheets.py         # Google Sheets writes
-│   └── telegram_bot.py   # Telegram notifications
-├── requirements.txt      # pip dependencies
-├── .env.example          # environment template without secrets
-├── service_account.json  # Google Service Account key (local/ignored)
-├── raw/                  # local/ignored source evidence
-├── wiki/                 # local/ignored maintained knowledge
-├── cover_letters/        # local/ignored generated letters
-└── README.md
-```
+
+`GOOGLE_SERVICE_ACCOUNT_JSON` should contain the full JSON key content. The
+workflow writes it to `service_account.json` at runtime.
+
+## Local Knowledge Base
+
+This workspace also supports a Codex-maintained local wiki:
+
+- `raw/` stores immutable source material.
+- `wiki/` stores maintained markdown knowledge.
+- `cover_letters/` stores generated application material.
+
+These folders are ignored by Git because they contain personal candidate data.
+Project instructions and reusable Codex skills are tracked in `AGENTS.md` and
+`.codex/skills/`.
