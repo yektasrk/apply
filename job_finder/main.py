@@ -9,7 +9,6 @@ import datetime
 import logging
 import sys
 
-from . import ai_matcher
 from . import config
 from . import scraper
 from . import sheets
@@ -56,19 +55,9 @@ def validate_configs() -> None:
         missing.append("TELEGRAM_BOT_TOKEN")
     if config.TELEGRAM_CHANNEL_ID in ("", "@your_channel"):
         missing.append("TELEGRAM_CHANNEL_ID")
-    if config.AI_MATCHING_REQUIRED and not config.OPENAI_API_KEY:
-        missing.append("OPENAI_API_KEY")
     if missing:
         print(f"❌ Missing or unconfigured secrets: {', '.join(missing)}", file=sys.stderr)
         sys.exit(1)
-    if config.OPENAI_API_KEY:
-        try:
-            ai_matcher.validate_config()
-        except RuntimeError as exc:
-            print(f"❌ {exc}", file=sys.stderr)
-            sys.exit(1)
-    elif not config.AI_MATCHING_REQUIRED:
-        log.warning("OPENAI_API_KEY is not configured; writing jobs without AI matching.")
 
 
 async def main() -> None:
