@@ -53,9 +53,7 @@ source .env
 set +a
 ```
 
-> **Tip:** Keep `.env`, `service_account.json`, `resume.md`, PDFs, `raw/`, `wiki/`, and `cover_letters/` local. They are ignored by Git.
-
-`AI_MATCHING_REQUIRED=true` fails fast when OpenAI matching cannot run. GitHub Actions sets it to `false` so scraping can still write new jobs when OpenAI quota is temporarily unavailable.
+> **Tip:** Keep `.env`, `service_account.json`, CV/resume files, PDFs, `raw/`, `wiki/`, and `cover_letters/` local. They are ignored by Git.
 
 ---
 
@@ -137,12 +135,10 @@ apply/
 │   ├── config.py         # App settings
 │   ├── scraper.py        # LinkedIn scraping
 │   ├── sheets.py         # Google Sheets writes
-│   ├── ai_matcher.py     # Resume/job compatibility
 │   └── telegram_bot.py   # Telegram notifications
 ├── requirements.txt      # pip dependencies
 ├── .env.example          # environment template without secrets
 ├── service_account.json  # Google Service Account key (local/ignored)
-├── resume.md             # local/ignored
 ├── raw/                  # local/ignored source evidence
 ├── wiki/                 # local/ignored maintained knowledge
 ├── cover_letters/        # local/ignored generated letters
