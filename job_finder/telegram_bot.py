@@ -8,7 +8,7 @@ import logging
 from telegram import Bot
 from telegram.error import RetryAfter, TimedOut, NetworkError
 
-import config
+from . import config
 
 log = logging.getLogger(__name__)
 

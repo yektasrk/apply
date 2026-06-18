@@ -10,8 +10,9 @@ import pandas as pd
 from google.oauth2.service_account import Credentials
 from tenacity import retry, retry_if_exception_type
 
-import config
-from retries import RETRY
+from . import ai_matcher
+from . import config
+from .retries import RETRY
 
 log = logging.getLogger(__name__)
 
@@ -105,7 +106,11 @@ def _find_empty_rows(all_values: list[list[str]], row_count: int, size: int) -> 
     return rows
 
 
-def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
+def _write_rows(
+    ws: gspread.Worksheet,
+    rows: list[list],
+    suitability_notes: list[str] | None = None,
+) -> None:
     """Expand the grid if needed, then write rows into the earliest empty rows."""
     @retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
     def _do_write() -> None:
@@ -123,6 +128,13 @@ def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
             ],
             value_input_option="USER_ENTERED",
         )
+        if suitability_notes:
+            ws.update_notes(
+                {
+                    f"B{row_num}": note
+                    for row_num, note in zip(target_rows, suitability_notes)
+                }
+            )
 
     try:
         _do_write()
@@ -144,6 +156,20 @@ def _prepare_df(jobs: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = ""
     return df[SHEET_COLUMNS].fillna("").astype(str)
+
+
+def _enrich_jobs(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str] | None]:
+    if not config.OPENAI_API_KEY and not config.AI_MATCHING_REQUIRED:
+        log.warning("Skipping AI compatibility checks; OPENAI_API_KEY is not set.")
+        return df, None
+
+    try:
+        return ai_matcher.enrich_jobs(df)
+    except RuntimeError as exc:
+        if not config.AI_MATCHING_REQUIRED and "OpenAI project" in str(exc):
+            log.warning("Skipping AI compatibility checks: %s", exc)
+            return df, None
+        raise
 
 
 def push_jobs(jobs: pd.DataFrame) -> tuple[int, int]:
@@ -171,7 +197,8 @@ def push_jobs(jobs: pd.DataFrame) -> tuple[int, int]:
         log.info("No new jobs to write — all duplicates.")
         return 0, skipped
 
-    _write_rows(ws, _build_rows(df))
+    df, suitability_notes = _enrich_jobs(df)
+    _write_rows(ws, _build_rows(df), suitability_notes)
     return len(df), skipped
 
 
@@ -189,5 +216,6 @@ def push_single(job: pd.Series) -> bool:
         return False
 
     df = _prepare_df(pd.DataFrame([job]))
-    _write_rows(ws, _build_rows(df))
+    df, suitability_notes = _enrich_jobs(df)
+    _write_rows(ws, _build_rows(df), suitability_notes)
     return True

@@ -1,4 +1,23 @@
 .DS_Store
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+job finder
+
+# Local secrets and machine-specific config
+.env
+.env.*
+!.env.example
+config_local.py
 service_account.json
+.codex/skills/triage-job-applications/references/current-sheet.md
+
+# Personal candidate data and generated application artifacts
+resume.md
+the local CV file
+raw/
+wiki/
+cover_letters/
