@@ -5,6 +5,24 @@ config.py — Edit everything here before running python -m job_finder.main
 import os
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_int(name: str, default: int) -> int:
+    return int(os.getenv(name, str(default)))
+
+
+def _env_list(name: str, default: list[str]) -> list[str]:
+    value = os.getenv(name)
+    if not value:
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 # ── Per-country config ──────────────────────────────────────────────────────────
 # Each key is the country name you pass via --country
 # Each value overrides: location, sheet tab, and optionally search terms
@@ -12,12 +30,15 @@ import os
 # Run:  python -m job_finder.main --country netherlands
 #       python -m job_finder.main --country germany
 
-SEARCH_TERMS: list[str] = [
-    '"Site Reliability Engineer"',
-    '"Platform Engineer"',
-    '"DevOps Engineer"',
-    '"Infrastructure Engineer"',
-]
+SEARCH_TERMS: list[str] = _env_list(
+    "SEARCH_TERMS",
+    [
+        '"Site Reliability Engineer"',
+        '"Platform Engineer"',
+        '"DevOps Engineer"',
+        '"Infrastructure Engineer"',
+    ],
+)
 
 COUNTRIES: dict[str, dict] = {
     "netherlands": {
@@ -72,15 +93,13 @@ LOCATION:   str = ""
 GOOGLE_SHEET_TAB: str = ""
 
 # ── Scrape settings ─────────────────────────────────────────────────────────────
-RESULTS_WANTED  = "50"
-HOURS_OLD       = "720"   # jobs posted within N hours
-REMOTE_ONLY     = False
-JOB_TYPE        = "fulltime"        # fulltime | parttime | internship | contract | None
-FETCH_DESCRIPTION = True
+RESULTS_WANTED = _env_int("RESULTS_WANTED", 50)
+HOURS_OLD = _env_int("HOURS_OLD", 720)  # jobs posted within N hours
+REMOTE_ONLY = _env_flag("REMOTE_ONLY", False)
+JOB_TYPE = os.getenv("JOB_TYPE", "fulltime") or None
+FETCH_DESCRIPTION = _env_flag("FETCH_DESCRIPTION", True)
 
-PROXIES: list[str] = [
-    # "user:pass@1.2.3.4:8000",
-]
+PROXIES: list[str] = _env_list("PROXIES", [])
 
 GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv(
     "GOOGLE_SERVICE_ACCOUNT_FILE",

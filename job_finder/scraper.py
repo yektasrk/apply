@@ -38,6 +38,7 @@ def _scrape_one_term(term: str) -> pd.DataFrame:
         hours_old=config.HOURS_OLD,
         is_remote=config.REMOTE_ONLY,
         job_type=config.JOB_TYPE,
+        proxies=config.PROXIES or None,
         linkedin_fetch_description=config.FETCH_DESCRIPTION,
     )
 
@@ -47,6 +48,7 @@ def _scrape_by_id(job_id: str) -> pd.DataFrame:
     return scrape_jobs(
         site_name=["linkedin"],
         linkedin_job_ids=[job_id],
+        proxies=config.PROXIES or None,
         linkedin_fetch_description=True,
     )
 
