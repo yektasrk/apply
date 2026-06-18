@@ -10,8 +10,8 @@ import pandas as pd
 from google.oauth2.service_account import Credentials
 from tenacity import retry, retry_if_exception_type
 
-import config
-from retries import RETRY
+from . import config
+from .retries import RETRY
 
 log = logging.getLogger(__name__)
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Read"
+  short_description: "Answer questions from a local markdown wiki"
+  default_prompt: "Use $wiki-read to answer this from the local wiki with cited page links."

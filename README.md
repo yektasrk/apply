@@ -20,9 +20,9 @@ pip install -r requirements.txt
 3. Enable **Google Sheets API** and **Google Drive API**
 4. Go to **IAM & Admin → Service Accounts** → Create a Service Account
 5. Under **Keys**, click **Add Key → JSON** — download the file
-6. Rename it to `service_account.json` and place it in this folder
+6. Rename it to `service_account.json` and place it in this folder. This file is local-only and ignored by Git.
 7. Open your Google Sheet → click **Share** → paste the service account email (looks like `xxx@xxx.iam.gserviceaccount.com`) → give it **Editor** access
-8. Set `GOOGLE_SHEET_NAME` in `config.py` to the exact name of your spreadsheet
+8. Copy `.env.example` to `.env` and set `GOOGLE_SHEET_NAME` to the exact name of your spreadsheet
 9. Copy the Sheet ID from the URL:
    `https://docs.google.com/spreadsheets/d/**SHEET_ID_HERE**/edit`
 
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 
 1. Open Telegram and message **@BotFather**
 2. Send `/newbot` and follow the prompts — copy the **token**
-3. Paste the token into `TELEGRAM_BOT_TOKEN` in `config.py`
+3. Paste the token into `TELEGRAM_BOT_TOKEN` in `.env` locally or into GitHub Secrets for Actions
 4. Add the bot to your channel as an **Administrator**
 5. Set `TELEGRAM_CHANNEL_ID`:
    - Public channel: `"@your_channel_name"`
@@ -43,25 +43,36 @@ pip install -r requirements.txt
 
 ## 4. Configure your search
 
-Edit `config.py`:
+Search defaults and country metadata live in `job_finder/config.py`. Override search terms and runtime settings with local environment variables:
 
-```python
-SEARCH_TERM    = "Python Developer"
-LOCATION       = "United States"
-RESULTS_WANTED = 50        # max jobs per run
-HOURS_OLD      = 24        # only jobs posted in last N hours
-REMOTE_ONLY    = False
-JOB_TYPE       = "fulltime"  # fulltime | parttime | internship | contract
+```bash
+cp .env.example .env
+# edit .env, then export it before running locally
+set -a
+source .env
+set +a
 ```
 
-> **Tip:** Set `HOURS_OLD=24` and run the script daily so you only get fresh listings.
+> **Tip:** Keep `.env`, `service_account.json`, CV/resume files, PDFs, `raw/`, `wiki/`, and `cover_letters/` local. They are ignored by Git.
+
+Common search overrides:
+
+```bash
+SEARCH_TERMS='"Site Reliability Engineer","Platform Engineer"'
+RESULTS_WANTED=50
+HOURS_OLD=720
+REMOTE_ONLY=false
+JOB_TYPE=fulltime
+FETCH_DESCRIPTION=true
+PROXIES=user:pass@1.2.3.4:8000,user:pass@5.6.7.8:8000
+```
 
 ---
 
 ## 5. Run
 
 ```bash
-python main.py
+python -m job_finder.main --country denmark
 ```
 
 ---
@@ -72,11 +83,11 @@ python main.py
 ```bash
 crontab -e
 # add:
-0 9 * * * cd /path/to/linkedin_job_scraper && python main.py >> scraper.log 2>&1
+0 9 * * * cd /path/to/apply && python -m job_finder.main --country denmark >> scraper.log 2>&1
 ```
 
 ### Windows — Task Scheduler
-Create a task that runs `python main.py` in the script directory.
+Create a task that runs `python -m job_finder.main --country denmark` in the project directory.
 
 ### GitHub Actions (free cloud runner)
 ```yaml
@@ -96,7 +107,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - run: python main.py
+      - run: python -m job_finder.main --country denmark
         env:
           SEARCH_TERM: "Python Developer"
           LOCATION: "United States"
@@ -115,10 +126,7 @@ in a step before running.
 
 LinkedIn blocks scrapers aggressively. Recommended mitigations:
 
-- **Add proxies** in `config.py`:
-  ```python
-  PROXIES = ["user:pass@1.2.3.4:8000"]
-  ```
+- **Add proxies** with `PROXIES=user:pass@1.2.3.4:8000` in your local `.env`
 - **Lower `RESULTS_WANTED`** — stick to ≤50 per run
 - **Increase `HOURS_OLD`** so you're not re-scraping everything
 - **Add a delay** — run once per day, not every few minutes
@@ -129,10 +137,19 @@ LinkedIn blocks scrapers aggressively. Recommended mitigations:
 ## File structure
 
 ```
-linkedin_job_scraper/
-├── main.py               # Main script
-├── config.py             # All settings (edit this)
+apply/
+├── job_finder/
+│   ├── main.py           # Scheduled scrape entry point
+│   ├── add_job.py        # Manual single-job entry point
+│   ├── config.py         # App settings
+│   ├── scraper.py        # LinkedIn scraping
+│   ├── sheets.py         # Google Sheets writes
+│   └── telegram_bot.py   # Telegram notifications
 ├── requirements.txt      # pip dependencies
-├── service_account.json  # Google Service Account key (you add this)
+├── .env.example          # environment template without secrets
+├── service_account.json  # Google Service Account key (local/ignored)
+├── raw/                  # local/ignored source evidence
+├── wiki/                 # local/ignored maintained knowledge
+├── cover_letters/        # local/ignored generated letters
 └── README.md
 ```

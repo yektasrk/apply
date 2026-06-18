@@ -1,19 +1,18 @@
 """
 main.py — Scrape LinkedIn jobs → Google Sheets + Telegram
-Run: python main.py
+Run: python -m job_finder.main
 """
 
 import asyncio
 import argparse
 import datetime
 import logging
-
-import config
-import scraper
-import sheets
 import sys
 
-import telegram_bot
+from . import config
+from . import scraper
+from . import sheets
+from . import telegram_bot
 
 logging.basicConfig(
     level=logging.INFO,
