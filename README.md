@@ -43,7 +43,7 @@ pip install -r requirements.txt
 
 ## 4. Configure your search
 
-Search terms and country metadata live in `job_finder/config.py`. Secrets and personal paths live in local environment variables:
+Search defaults and country metadata live in `job_finder/config.py`. Override search terms and runtime settings with local environment variables:
 
 ```bash
 cp .env.example .env
@@ -54,6 +54,18 @@ set +a
 ```
 
 > **Tip:** Keep `.env`, `service_account.json`, CV/resume files, PDFs, `raw/`, `wiki/`, and `cover_letters/` local. They are ignored by Git.
+
+Common search overrides:
+
+```bash
+SEARCH_TERMS='"Site Reliability Engineer","Platform Engineer"'
+RESULTS_WANTED=50
+HOURS_OLD=720
+REMOTE_ONLY=false
+JOB_TYPE=fulltime
+FETCH_DESCRIPTION=true
+PROXIES=user:pass@1.2.3.4:8000,user:pass@5.6.7.8:8000
+```
 
 ---
 
@@ -114,10 +126,7 @@ in a step before running.
 
 LinkedIn blocks scrapers aggressively. Recommended mitigations:
 
-- **Add proxies** in `job_finder/config.py`:
-  ```python
-  PROXIES = ["user:pass@1.2.3.4:8000"]
-  ```
+- **Add proxies** with `PROXIES=user:pass@1.2.3.4:8000` in your local `.env`
 - **Lower `RESULTS_WANTED`** — stick to ≤50 per run
 - **Increase `HOURS_OLD`** so you're not re-scraping everything
 - **Add a delay** — run once per day, not every few minutes
