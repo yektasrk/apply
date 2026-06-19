@@ -146,14 +146,14 @@ def _prepare_df(jobs: pd.DataFrame) -> pd.DataFrame:
     return df[SHEET_COLUMNS].fillna("").astype(str)
 
 
-def push_jobs(jobs: pd.DataFrame) -> tuple[int, int]:
+def push_jobs(jobs: pd.DataFrame) -> tuple[int, int, pd.DataFrame]:
     """
     Append only new (non-duplicate) jobs to Google Sheets.
-    Returns (rows_written, rows_skipped).
+    Returns (rows_written, rows_skipped, new_jobs).
     """
     if jobs.empty:
         log.warning("No jobs to push.")
-        return 0, 0
+        return 0, 0, pd.DataFrame()
 
     ws = get_worksheet()
     ensure_header(ws)
@@ -169,10 +169,10 @@ def push_jobs(jobs: pd.DataFrame) -> tuple[int, int]:
         log.info("Skipped %d duplicate(s) already in sheet.", skipped)
     if df.empty:
         log.info("No new jobs to write — all duplicates.")
-        return 0, skipped
+        return 0, skipped, df
 
     _write_rows(ws, _build_rows(df))
-    return len(df), skipped
+    return len(df), skipped, df
 
 
 def push_single(job: pd.Series) -> bool:

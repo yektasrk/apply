@@ -3,6 +3,7 @@ telegram_bot.py — Telegram notification logic
 """
 
 import asyncio
+import html
 import logging
 
 from telegram import Bot
@@ -11,6 +12,8 @@ from telegram.error import RetryAfter, TimedOut, NetworkError
 from . import config
 
 log = logging.getLogger(__name__)
+
+MESSAGE_LIMIT = 4096
 
 
 def location_flag(location: str) -> str:
@@ -22,7 +25,17 @@ def location_flag(location: str) -> str:
     return "🌍"
 
 
-def _chunks(text: str, limit: int = 4096) -> list[str]:
+def escape(text: object) -> str:
+    return html.escape(str(text or ""), quote=False)
+
+
+def text_link(label: object, url: object) -> str:
+    label_text = escape(label)
+    url_text = html.escape(str(url or ""), quote=True)
+    return f'<a href="{url_text}">{label_text}</a>' if url_text else label_text
+
+
+def _chunks(text: str, limit: int = MESSAGE_LIMIT) -> list[str]:
     lines = text.split("\n")
     chunks, current, length = [], [], 0
     for line in lines:
@@ -37,17 +50,19 @@ def _chunks(text: str, limit: int = 4096) -> list[str]:
     return chunks
 
 
-async def send(text: str) -> None:
+async def send(messages: str | list[str]) -> None:
     """Send a message to the configured Telegram channel, chunked and with retries."""
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-    for i, chunk in enumerate(_chunks(text)):
+    chunks = _chunks(messages) if isinstance(messages, str) else messages
+
+    for i, chunk in enumerate(chunks):
         attempt = 0
         while True:
             try:
                 await bot.send_message(
                     chat_id=config.TELEGRAM_CHANNEL_ID,
                     text=chunk,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
                 break
@@ -63,6 +78,6 @@ async def send(text: str) -> None:
                 wait = 5 * attempt
                 log.warning("Telegram error (%s) — retry %d/3 in %ds …", e, attempt, wait)
                 await asyncio.sleep(wait)
-        if i < len(_chunks(text)) - 1:
+        if i < len(chunks) - 1:
             await asyncio.sleep(0.5)
     log.info("Sent message to %s.", config.TELEGRAM_CHANNEL_ID)

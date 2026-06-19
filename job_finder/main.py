@@ -33,18 +33,69 @@ def configure_country(country: str) -> None:
     config.GOOGLE_SHEET_TAB = country_config["sheet_tab"]
 
 
-def build_message(jobs, rows_written: int) -> str:
-    now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
-    lines = [f"🔍 *{rows_written} new jobs* — {now}", ""]
+def _job_message_entry(job, number: int) -> str:
+    title = job.get("title", "N/A")
+    url = job.get("job_url", "")
+    company = job.get("company", "")
+    location = job.get("location", "")
+    flag = telegram_bot.location_flag(str(location))
 
-    for _, job in jobs.iterrows():
-        title = job.get("title", "N/A")
-        url   = job.get("job_url", "")
-        flag  = telegram_bot.location_flag(str(job.get("location", "")))
-        lines.append(f"{flag} [{title}]({url})" if url else f"{flag} {title}")
-
-    lines.append(f"\n📊 [Open Sheet](https://docs.google.com/spreadsheets/d/{config.GOOGLE_SHEET_ID})")
+    lines = [
+        f"{number}. {flag} {telegram_bot.text_link(title, url)}",
+    ]
+    if company:
+        lines.append(f"   Company: {telegram_bot.escape(company)}")
+    if location:
+        lines.append(f"   Location: {telegram_bot.escape(location)}")
     return "\n".join(lines)
+
+
+def _message_page(entries: list[str], rows_written: int, page: int, total_pages: int) -> str:
+    now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
+    country = telegram_bot.escape(config.LOCATION)
+    flag = telegram_bot.location_flag(config.LOCATION)
+    page_label = f" ({page}/{total_pages})" if total_pages > 1 else ""
+    sheet_url = f"https://docs.google.com/spreadsheets/d/{config.GOOGLE_SHEET_ID}"
+
+    return "\n".join(
+        [
+            f"<b>{flag} {country}</b>{page_label}",
+            f"<b>{rows_written} new jobs</b> — {now}",
+            "",
+            f"<blockquote expandable>{chr(10).join(entries)}</blockquote>",
+            "",
+            f"📊 {telegram_bot.text_link('Open Sheet', sheet_url)}",
+        ]
+    )
+
+
+def build_messages(jobs, rows_written: int) -> list[str]:
+    if rows_written == 0 or jobs.empty:
+        return []
+
+    entries = [
+        _job_message_entry(job, number)
+        for number, (_, job) in enumerate(jobs.iterrows(), start=1)
+    ]
+    pages: list[list[str]] = []
+    current: list[str] = []
+
+    for entry in entries:
+        candidate = current + [entry]
+        preview = _message_page(candidate, rows_written, 999, 999)
+        if current and len(preview) > telegram_bot.MESSAGE_LIMIT:
+            pages.append(current)
+            current = [entry]
+        else:
+            current = candidate
+    if current:
+        pages.append(current)
+
+    total_pages = len(pages)
+    return [
+        _message_page(page_entries, rows_written, page, total_pages)
+        for page, page_entries in enumerate(pages, start=1)
+    ]
 
 
 def validate_configs() -> None:
@@ -73,10 +124,12 @@ async def main() -> None:
         log.warning("No jobs found. Exiting.")
         return
 
-    rows_written, rows_skipped = sheets.push_jobs(jobs)
+    rows_written, rows_skipped, new_jobs = sheets.push_jobs(jobs)
     log.info("Written: %d  |  Skipped (dupes): %d", rows_written, rows_skipped)
 
-    await telegram_bot.send(build_message(jobs, rows_written))
+    messages = build_messages(new_jobs, rows_written)
+    if messages:
+        await telegram_bot.send(messages)
     log.info("Done ✓")
 
 
