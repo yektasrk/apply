@@ -39,14 +39,12 @@ def _job_message_entry(job, number: int) -> str:
     company = job.get("company", "")
     location = job.get("location", "")
     flag = telegram_bot.location_flag(str(location))
+    title_text = telegram_bot.text_link(title, url)
 
-    lines = [
-        f"{number}. {flag} {telegram_bot.text_link(title, url)}",
-    ]
     if company:
-        lines.append(f"   Company: {telegram_bot.escape(company)}")
-    if location:
-        lines.append(f"   Location: {telegram_bot.escape(location)}")
+        title_text = f"{title_text} at {telegram_bot.escape(company)}"
+
+    lines = [f"{number}. {flag} {title_text}"]
     return "\n".join(lines)
 
 

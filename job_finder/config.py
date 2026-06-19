@@ -94,7 +94,7 @@ GOOGLE_SHEET_TAB: str = ""
 
 # ── Scrape settings ─────────────────────────────────────────────────────────────
 RESULTS_WANTED = _env_int("RESULTS_WANTED", 50)
-HOURS_OLD = _env_int("HOURS_OLD", 720)  # jobs posted within N hours
+HOURS_OLD = _env_int("HOURS_OLD", 36)  # jobs posted within N hours
 REMOTE_ONLY = _env_flag("REMOTE_ONLY", False)
 JOB_TYPE = os.getenv("JOB_TYPE", "fulltime") or None
 FETCH_DESCRIPTION = _env_flag("FETCH_DESCRIPTION", True)
