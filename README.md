@@ -125,7 +125,7 @@ python -m job_finder.check_availability --gid 711463063
 The checker scans configured country tabs by default. If you pass a full Google
 Sheets URL with `gid=...`, it checks that tab unless you also pass `--country`,
 `--tab`, or `--gid`. When a job URL is clearly closed, it writes `Closed` to
-`me_applyed`, including rows currently marked `Suitable` or `Not Suitable`. It
+`job_status`, including rows currently marked `Suitable` or `Not Suitable`. It
 leaves applied/rejected terminal statuses alone unless run with `--force`.
 
 Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
@@ -136,7 +136,7 @@ Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
 The workflow in `.github/workflows/scrape-countries.yml` runs on GitHub-hosted
 Python 3.13 runners. It can be triggered manually with a `country` input, and it
 also runs on this UTC schedule. Each run first checks existing rows for that
-country and marks closed jobs in `me_applyed`, then scrapes and appends new jobs.
+country and marks closed jobs in `job_status`, then scrapes and appends new jobs.
 
 ```text
 00:00 netherlands
