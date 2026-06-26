@@ -70,7 +70,7 @@ jobs:
   scrape:
     needs: resolve-country
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -91,7 +91,22 @@ jobs:
           test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
           printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
 
-      - name: Scrape ${{ needs.resolve-country.outputs.country }}
+      - name: Part 1/2 - Mark closed jobs in ${{ needs.resolve-country.outputs.country }}
+        shell: bash
+        env:
+          GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
+          GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          AVAILABILITY_CHECK_LIMIT: ${{ vars.AVAILABILITY_CHECK_LIMIT }}
+          AVAILABILITY_CHECK_SLEEP: ${{ vars.AVAILABILITY_CHECK_SLEEP }}
+        run: |
+          args=(--country "${{ needs.resolve-country.outputs.country }}" --sleep "${AVAILABILITY_CHECK_SLEEP:-0}")
+          if [ -n "${AVAILABILITY_CHECK_LIMIT:-}" ]; then
+            args+=(--limit "$AVAILABILITY_CHECK_LIMIT")
+          fi
+          python -m job_finder.check_availability "${args[@]}"
+
+      - name: Part 2/2 - Scrape and append ${{ needs.resolve-country.outputs.country }}
         env:
           GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
           GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}

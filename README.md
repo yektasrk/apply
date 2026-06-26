@@ -15,6 +15,7 @@ apply/
 ├── job_finder/                 # Python package for scraping and sheet writes
 │   ├── main.py                 # Scheduled scrape entry point
 │   ├── add_job.py              # Add one LinkedIn job URL manually
+│   ├── check_availability.py   # Mark closed existing jobs in Google Sheets
 │   ├── config.py               # Countries and env-backed runtime settings
 │   ├── scraper.py              # LinkedIn scraping through JobSpy
 │   ├── sheets.py               # Google Sheets dedupe and append logic
@@ -110,6 +111,23 @@ Add one LinkedIn job URL manually:
 python -m job_finder.add_job --country denmark https://www.linkedin.com/jobs/view/1234567890
 ```
 
+Check existing sheet rows and mark closed jobs:
+
+```bash
+python -m job_finder.check_availability --dry-run
+python -m job_finder.check_availability --sheet "https://docs.google.com/spreadsheets/d/.../edit?gid=..."
+python -m job_finder.check_availability
+python -m job_finder.check_availability --country denmark
+python -m job_finder.check_availability --tab Denmark
+python -m job_finder.check_availability --gid 711463063
+```
+
+The checker scans configured country tabs by default. If you pass a full Google
+Sheets URL with `gid=...`, it checks that tab unless you also pass `--country`,
+`--tab`, or `--gid`. When a job URL is clearly closed, it writes `Closed` to
+`me_applyed`, including rows currently marked `Suitable` or `Not Suitable`. It
+leaves applied/rejected terminal statuses alone unless run with `--force`.
+
 Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
 `ireland`, `sweden`, `switzerland`, `portugal`, and `france`.
 
@@ -117,7 +135,8 @@ Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
 
 The workflow in `.github/workflows/scrape-countries.yml` runs on GitHub-hosted
 Python 3.13 runners. It can be triggered manually with a `country` input, and it
-also runs on this UTC schedule:
+also runs on this UTC schedule. Each run first checks existing rows for that
+country and marks closed jobs in `me_applyed`, then scrapes and appends new jobs.
 
 ```text
 00:00 netherlands
@@ -143,6 +162,16 @@ TELEGRAM_CHANNEL_ID
 
 `GOOGLE_SERVICE_ACCOUNT_JSON` should contain the full JSON key content. The
 workflow writes it to `service_account.json` at runtime.
+
+Optional repository variables:
+
+```text
+AVAILABILITY_CHECK_LIMIT
+AVAILABILITY_CHECK_SLEEP
+```
+
+Use `AVAILABILITY_CHECK_LIMIT` to cap the number of existing rows checked per
+run, and `AVAILABILITY_CHECK_SLEEP` to add delay between URL checks.
 
 ## Local Knowledge Base
 
