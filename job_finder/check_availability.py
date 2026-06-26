@@ -33,7 +33,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-STATUS_COLUMN = "me_applyed"
+STATUS_COLUMN = "job_status"
 URL_COLUMN = "job_url"
 CLOSED_VALUE = "Closed"
 
@@ -405,7 +405,7 @@ def main() -> None:
     parser.add_argument(
         "--closed-value",
         default=CLOSED_VALUE,
-        help="Value to write into me_applyed",
+        help="Value to write into job_status",
     )
     args = parser.parse_args()
 

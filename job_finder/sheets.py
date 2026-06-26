@@ -16,8 +16,8 @@ from .retries import RETRY
 log = logging.getLogger(__name__)
 
 SHEET_COLUMNS = [
-    "me_applyed",
-    "me_result",
+    "job_status",
+    "application_result",
     "title",
     "location",
     "company",
@@ -142,8 +142,8 @@ def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
 def _prepare_df(jobs: pd.DataFrame) -> pd.DataFrame:
     """Normalise a jobs DataFrame to exactly SHEET_COLUMNS."""
     df = jobs.copy()
-    df["me_applyed"] = ""
-    df["me_result"] = ""
+    df["job_status"] = ""
+    df["application_result"] = ""
     for col in SHEET_COLUMNS:
         if col not in df.columns:
             df[col] = ""

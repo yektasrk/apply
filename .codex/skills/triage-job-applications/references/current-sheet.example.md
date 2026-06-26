@@ -19,7 +19,7 @@ Copy this file to `current-sheet.md` locally and fill in the real spreadsheet me
 ## Observed Headers
 
 ```text
-scraped_at, me_applyed, me_result, title, location, company,
+scraped_at, job_status, application_result, title, location, company,
 company_industry, job_level, job_type, is_remote, min_amount, max_amount,
 currency, date_posted, job_url, description
 ```
