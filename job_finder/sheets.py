@@ -39,7 +39,7 @@ ROW_MARKER_COLUMNS = ("scraped_at", "title", "job_url")
 ROW_MARKER_INDICES = [EXPECTED_COLUMNS.index(column) for column in ROW_MARKER_COLUMNS]
 
 
-def get_worksheet() -> gspread.Worksheet:
+def get_spreadsheet() -> gspread.Spreadsheet:
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
@@ -48,7 +48,11 @@ def get_worksheet() -> gspread.Worksheet:
         config.GOOGLE_SERVICE_ACCOUNT_FILE, scopes=scopes
     )
     client = gspread.authorize(creds)
-    sheet = client.open_by_key(config.GOOGLE_SHEET_ID)
+    return client.open_by_key(config.GOOGLE_SHEET_ID)
+
+
+def get_worksheet() -> gspread.Worksheet:
+    sheet = get_spreadsheet()
     return sheet.worksheet(config.GOOGLE_SHEET_TAB)
 
 
