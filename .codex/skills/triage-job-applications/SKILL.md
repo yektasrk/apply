@@ -26,7 +26,7 @@ If no performance-review material is available yet, generate from the resume and
 Use the existing sheet semantics unless the user specifies a different sheet. Refresh headers and tab metadata before writes; the current workspace defaults are in local-only [current-sheet.md](references/current-sheet.md), created from the tracked [current-sheet.example.md](references/current-sheet.example.md).
 
 - Status column: `job_status`
-- Suitable values: `Suitable` or `Yes`
+- Suitable values: `Suitable`
 - Not-suitable value: `Not Suitable`
 - Terminal skip values in `job_status`: `Closed`, `Resume Send`, `Resume Reject`, or any user-defined applied/rejected state
 - Undecided values in `job_status`: blank, `FALSE`, `No`, or other non-terminal legacy placeholders
@@ -35,7 +35,7 @@ Use the existing sheet semantics unless the user specifies a different sheet. Re
 - Cover-letter marker: `cover_letter_path`; create it if missing
 - Primary source columns: `title`, `company`, `location`, `job_url`, `description`, `job_level`, `job_type`, `is_remote`, `date_posted`
 
-Treat `cover_letter_path` as the only durable marker that a cover letter has already been generated. If the user later changes a row from `Not Suitable` to `Suitable` or `Yes`, the next run should generate its cover letter if `cover_letter_path` is still blank.
+Treat `cover_letter_path` as the only durable marker that a cover letter has already been generated. If the user later changes a row from `Not Suitable` to `Suitable`, the next run should generate its cover letter if `cover_letter_path` is still blank.
 
 ## Workflow
 
@@ -45,9 +45,9 @@ Treat `cover_letter_path` as the only durable marker that a cover letter has alr
 4. Ensure the output columns `suitability_reason` and `cover_letter_path` exist on every target tab. Append missing columns to the right of the existing table.
 5. Select candidate rows where `job_url` is nonblank, `application_result` is blank, `job_status` is not terminal, and either `cover_letter_path` is blank or suitability is not yet decided.
 6. For each row being decided or drafted, read the full job description, not only a title, excerpt, keyword list, or precomputed summary. If the tab is large, process rows in small batches so each row's whole text can fit in context.
-7. For rows with undecided `job_status`, apply the rubric in [rubric-and-cover-letters.md](references/rubric-and-cover-letters.md) directly in Codex's reasoning. Do not use a script or scoring function to generate the decision or reason.
-8. Write `Suitable` or `Not Suitable` to `job_status`. For not-suitable rows, write a concise, specific explanation to `suitability_reason`; for suitable rows, leave it blank or write a short positive rationale if useful.
-9. After triage, do not wait for manual review unless the user asked for a triage-only pass. Generate cover-letter files for every row whose `job_status` is `Suitable` or `Yes`, `application_result` is blank, and `cover_letter_path` is blank.
+7. For rows with undecided `job_status`, apply the rubric in [rubric-and-cover-letters.md](references/rubric-and-cover-letters.md) directly in Codex's reasoning. Do not use a script or scoring function to generate the decision or reason. Pay particular attention to the language-requirement rules there: reject for non-English language only when the full description states a hard requirement, not because the posting is in a local language, mentions local offices/customers, or offers a translated version.
+8. Write `Suitable` or `Not Suitable` to `job_status`. For not-suitable rows, write a concise, specific explanation to `suitability_reason` that names the actual blocker from the job text. Do not use generic fallback wording. For suitable rows, leave it blank or write a short positive rationale if useful.
+9. After triage, do not wait for manual review unless the user asked for a triage-only pass. Generate cover-letter files for every row whose `job_status` is `Suitable`, `application_result` is blank, and `cover_letter_path` is blank.
 10. Save each cover letter under `/Users/yekta/Desktop/Apply/cover_letters/<Country>/` unless the user provides another destination. Use the sheet tab name as the country when available; otherwise infer the country from `location` or `config.COUNTRIES`. Use the filename `<Company>.md`, sanitized only for filesystem safety. Do not include the date, role, seniority, or long slugs. Avoid overwriting existing files; if the same company already has a different Markdown cover letter in that country folder, append a short numeric suffix such as `<Company>-2.md`.
 11. Write the absolute file path back to `cover_letter_path`.
 12. Report counts: rows reviewed, suitable, not suitable, cover letters generated, rows skipped, and any failures needing attention.
