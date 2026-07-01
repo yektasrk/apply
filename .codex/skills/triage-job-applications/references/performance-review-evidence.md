@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Performance reviews are the preferred evidence source for cover-letter stories because they describe work the user actually did, strengths observed over time, collaboration style, scope, and impact. Use them to make letters more valuable than a resume-bullet rewrite.
+Performance reviews can be a useful evidence source for cover-letter stories when they are human-authored or otherwise reliable because they may describe work the user actually did, strengths observed over time, collaboration style, scope, and impact. If the local markdown was AI-authored or synthesized, do not treat it as the user's voice and do not use it as prose to imitate. Use it only as secondary factual notes, and prefer facts also supported by the resume, original review source, or explicit user confirmation.
 
 ## Importing Google Docs
 
@@ -18,7 +18,7 @@ Creating or updating these markdown files is mechanical source ingestion. It doe
 
 ## Using The Evidence
 
-Before drafting a cover letter, read the relevant performance-review markdown alongside the resume and full job description. Extract only details that are directly supported by the review text.
+Before drafting a cover letter, read the relevant performance-review markdown alongside the resume and full job description only if it is relevant and reliable enough for the task. Extract only details that are directly supported by the review text, and if the markdown was AI-authored, corroborate important details before using them.
 
 Prefer evidence that shows:
 
@@ -33,6 +33,7 @@ Avoid:
 
 - unsupported claims, inflated scope, or invented metrics
 - copying review sentences verbatim unless a short phrase is necessary
+- copying or imitating AI-authored review phrasing, rhythm, or narrative structure
 - using private feedback that would be awkward or inappropriate in a job application
 - turning every positive point into the letter; select only the strongest match for the job
 

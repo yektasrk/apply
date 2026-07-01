@@ -17,7 +17,7 @@ Scripts and tools may only perform mechanical operations: reading sheet values, 
 
 Use the resume as a compact factual baseline, not as the main prose source. Do not copy resume bullet points into cover letters.
 
-When performance reviews are available, read them and use them as the richer evidence source for accomplishments, strengths, scope, impact, and working style. Performance reviews may come from Google Docs that need to be imported as markdown into the project first; follow [performance-review-evidence.md](references/performance-review-evidence.md).
+When performance reviews are available, read them and use them as factual context only when their origin is reliable. If the user says the performance-review markdown was AI-authored, or if authorship is unclear, do not treat it as the user's voice and do not use its phrasing to humanize a cover letter. Use it only as secondary factual notes, preferably after corroborating the detail with the resume, the original source, or explicit user-provided facts. Performance reviews may come from Google Docs that need to be imported as markdown into the project first; follow [performance-review-evidence.md](references/performance-review-evidence.md).
 
 If no performance-review material is available yet, generate from the resume and job description, but write narrative evidence rather than pasted bullet points and clearly avoid unsupported claims.
 
@@ -56,7 +56,9 @@ Treat `cover_letter_path` as the only durable marker that a cover letter has alr
 
 Generate the letter directly from the full resume, full job description, and available performance-review evidence in Codex's own response process. Use the job description to infer the employer's strongest priorities, then select only the closest truthful evidence from the resume and performance reviews.
 
-The cover letter should not sound like a copy of the resume. Prefer one or two high-value work stories grounded in what the user actually did, especially work reflected in performance reviews. Turn those facts into natural prose with context, stakes, action, and impact, without adding anything unsupported.
+The cover letter should not sound like a copy of the resume. Prefer one or two high-value work stories grounded in what the user actually did. If performance-review markdown is known to be AI-authored, use resume-supported facts first and do not imitate or reuse the review prose. Turn supported facts into natural prose with context, stakes, action, and impact, without adding anything unsupported.
+
+Before saving, run a final human-voice pass. The goal is truthful applicant-specific writing, not detector evasion. Remove common AI-writing tells: generic polished claims, repetitive sentence rhythm, overly neat transitions, flat tone, buzzword stacks, and openings that could fit any candidate. Add at least one supported concrete detail from the user's actual work or the job's real priorities, and vary sentence length naturally without making the letter casual.
 
 Follow the rules in [rubric-and-cover-letters.md](references/rubric-and-cover-letters.md). The non-negotiables are: no invented experience, no invented company facts, no fake metrics, no unsupported work authorization or relocation claims, and no generic resume dump.
 
