@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import datetime
+import email.utils
 import html
 import logging
 import re
 import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterable
 
@@ -36,6 +39,8 @@ log = logging.getLogger(__name__)
 STATUS_COLUMN = "job_status"
 URL_COLUMN = "job_url"
 CLOSED_VALUE = "Closed"
+DEFAULT_RATE_LIMIT_COOLDOWN = 300
+MAX_RATE_LIMIT_COOLDOWN = 1800
 
 OVERWRITABLE_STATUSES = {
     "",
@@ -124,6 +129,53 @@ def _extract_sheet_gid(value: str) -> int | None:
     return None
 
 
+def _url_host(url: str) -> str:
+    return urllib.parse.urlparse(url).netloc.lower()
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+
+    clean = value.strip()
+    try:
+        return max(0.0, float(clean))
+    except ValueError:
+        pass
+
+    try:
+        retry_at = email.utils.parsedate_to_datetime(clean)
+    except (TypeError, ValueError):
+        return None
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=datetime.UTC)
+
+    now = datetime.datetime.now(datetime.UTC)
+    return max(0.0, (retry_at - now).total_seconds())
+
+
+def _cooldown_remaining(host: str, cooldowns: dict[str, float]) -> float:
+    until = cooldowns.get(host, 0.0)
+    remaining = until - time.monotonic()
+    if remaining <= 0:
+        cooldowns.pop(host, None)
+        return 0.0
+    return remaining
+
+
+def _record_rate_limit(
+    host: str,
+    retry_after: str | None,
+    cooldowns: dict[str, float],
+    fallback_seconds: float,
+) -> float:
+    parsed_wait = _retry_after_seconds(retry_after)
+    wait_seconds = fallback_seconds if parsed_wait is None else parsed_wait
+    wait_seconds = max(0.0, min(wait_seconds, MAX_RATE_LIMIT_COOLDOWN))
+    cooldowns[host] = time.monotonic() + wait_seconds
+    return wait_seconds
+
+
 def _request_url(url: str, timeout: int) -> tuple[int, str, str]:
     request = urllib.request.Request(
         url,
@@ -172,7 +224,15 @@ def _classify_response(
     return Availability("unknown", f"HTTP {status}")
 
 
-def check_job_url(url: str, timeout: int) -> Availability:
+def check_job_url(
+    url: str,
+    timeout: int,
+    rate_limit_cooldowns: dict[str, float] | None = None,
+    rate_limit_cooldown: float = DEFAULT_RATE_LIMIT_COOLDOWN,
+) -> Availability:
+    if rate_limit_cooldowns is None:
+        rate_limit_cooldowns = {}
+
     linkedin_job_id = _extract_linkedin_job_id(url)
     urls_to_try = []
     if linkedin_job_id:
@@ -184,6 +244,16 @@ def check_job_url(url: str, timeout: int) -> Availability:
     last_closed: Availability | None = None
     last_unknown: Availability | None = None
     for candidate_url in urls_to_try:
+        host = _url_host(candidate_url)
+        remaining = _cooldown_remaining(host, rate_limit_cooldowns)
+        if remaining:
+            if last_unknown is None:
+                last_unknown = Availability(
+                    "unknown",
+                    f"rate limited: {host} cooldown active ({remaining:.0f}s remaining)",
+                )
+            continue
+
         try:
             status, final_url, body = _request_url(candidate_url, timeout)
         except urllib.error.HTTPError as error:
@@ -192,6 +262,17 @@ def check_job_url(url: str, timeout: int) -> Availability:
             except Exception:
                 body = ""
             availability = _classify_response(error.code, error.url, body, url)
+            if error.code == 429:
+                wait_seconds = _record_rate_limit(
+                    host,
+                    error.headers.get("Retry-After"),
+                    rate_limit_cooldowns,
+                    rate_limit_cooldown,
+                )
+                availability = Availability(
+                    "unknown",
+                    f"HTTP 429; cooling down {host} for {wait_seconds:.0f}s",
+                )
         except urllib.error.URLError as error:
             availability = Availability("unknown", f"request failed: {error.reason}")
         except TimeoutError:
@@ -288,6 +369,7 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
     status_col = headers[STATUS_COLUMN]
     url_col = headers[URL_COLUMN]
     updates = []
+    rate_limit_cooldowns: dict[str, float] = {}
     counts = {
         "rows": max(0, len(values) - 1),
         "checked": 0,
@@ -312,7 +394,12 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
             continue
 
         counts["checked"] += 1
-        availability = check_job_url(url, args.timeout)
+        availability = check_job_url(
+            url,
+            args.timeout,
+            rate_limit_cooldowns=rate_limit_cooldowns,
+            rate_limit_cooldown=args.rate_limit_cooldown,
+        )
         counts[availability.state] += 1
 
         title = (
@@ -391,6 +478,12 @@ def main() -> None:
         type=int,
         default=0,
         help="Maximum rows to check per worksheet; 0 means no limit",
+    )
+    parser.add_argument(
+        "--rate-limit-cooldown",
+        type=float,
+        default=DEFAULT_RATE_LIMIT_COOLDOWN,
+        help="Cooldown per host after HTTP 429, in seconds",
     )
     parser.add_argument(
         "--dry-run",

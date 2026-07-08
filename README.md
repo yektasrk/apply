@@ -135,8 +135,10 @@ Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
 
 The workflow in `.github/workflows/scrape-countries.yml` runs on GitHub-hosted
 Python 3.13 runners. It can be triggered manually with a `country` input, and it
-also runs on this UTC schedule. Each run first checks existing rows for that
-country and marks closed jobs in `job_status`, then scrapes and appends new jobs.
+also runs on this UTC schedule. Each run resolves the target country, then runs
+scraping and closed-job marking as separate jobs in parallel. The closed-job
+marker writes `Closed` to `job_status` and is allowed to finish independently of
+the scraper.
 
 ```text
 00:00 netherlands
@@ -168,10 +170,14 @@ Optional repository variables:
 ```text
 AVAILABILITY_CHECK_LIMIT
 AVAILABILITY_CHECK_SLEEP
+AVAILABILITY_RATE_LIMIT_COOLDOWN
 ```
 
 Use `AVAILABILITY_CHECK_LIMIT` to cap the number of existing rows checked per
-run, and `AVAILABILITY_CHECK_SLEEP` to add delay between URL checks.
+run. Use `AVAILABILITY_CHECK_SLEEP` to control the delay between URL checks; the
+GitHub Actions workflow defaults this to 3 seconds when the variable is unset.
+Use `AVAILABILITY_RATE_LIMIT_COOLDOWN` to override the per-host cooldown after
+HTTP 429 responses; the checker defaults this to 300 seconds.
 
 ## Local Knowledge Base
 
