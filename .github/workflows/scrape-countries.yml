@@ -91,22 +91,7 @@ jobs:
           test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
           printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
 
-      - name: Part 1/2 - Mark closed jobs in ${{ needs.resolve-country.outputs.country }}
-        shell: bash
-        env:
-          GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
-          GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          AVAILABILITY_CHECK_LIMIT: ${{ vars.AVAILABILITY_CHECK_LIMIT }}
-          AVAILABILITY_CHECK_SLEEP: ${{ vars.AVAILABILITY_CHECK_SLEEP }}
-        run: |
-          args=(--country "${{ needs.resolve-country.outputs.country }}" --sleep "${AVAILABILITY_CHECK_SLEEP:-0}")
-          if [ -n "${AVAILABILITY_CHECK_LIMIT:-}" ]; then
-            args+=(--limit "$AVAILABILITY_CHECK_LIMIT")
-          fi
-          python -m job_finder.check_availability "${args[@]}"
-
-      - name: Part 2/2 - Scrape and append ${{ needs.resolve-country.outputs.country }}
+      - name: Scrape and append ${{ needs.resolve-country.outputs.country }}
         env:
           GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
           GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
@@ -114,3 +99,47 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
         run: python -m job_finder.main --country "${{ needs.resolve-country.outputs.country }}"
+
+  mark-closed:
+    needs: resolve-country
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Write Google service account
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > service_account.json
+
+      - name: Mark closed jobs in ${{ needs.resolve-country.outputs.country }}
+        shell: bash
+        env:
+          GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
+          GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          AVAILABILITY_CHECK_LIMIT: ${{ vars.AVAILABILITY_CHECK_LIMIT }}
+          AVAILABILITY_CHECK_SLEEP: ${{ vars.AVAILABILITY_CHECK_SLEEP }}
+          AVAILABILITY_RATE_LIMIT_COOLDOWN: ${{ vars.AVAILABILITY_RATE_LIMIT_COOLDOWN }}
+        run: |
+          args=(--country "${{ needs.resolve-country.outputs.country }}" --sleep "${AVAILABILITY_CHECK_SLEEP:-3}")
+          if [ -n "${AVAILABILITY_CHECK_LIMIT:-}" ]; then
+            args+=(--limit "$AVAILABILITY_CHECK_LIMIT")
+          fi
+          if [ -n "${AVAILABILITY_RATE_LIMIT_COOLDOWN:-}" ]; then
+            args+=(--rate-limit-cooldown "$AVAILABILITY_RATE_LIMIT_COOLDOWN")
+          fi
+          python -m job_finder.check_availability "${args[@]}"
