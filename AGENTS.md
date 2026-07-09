@@ -19,7 +19,7 @@ Three wiki skills support this wiki. They live canonically in `skills/` and are 
 - `raw/`: user-curated source material. Read from this directory, but do not edit, rename, delete, or reorganize files in it unless the user explicitly asks. Use `raw/assets/` for source images and attachments.
 - `wiki/`: agent-maintained markdown wiki. The agent may create and edit files here during wiki work.
 - `wiki/index.md`: content-oriented catalog. Update this after every ingest, page creation, page rename, or substantial wiki edit.
-- `wiki/log.md`: append-only chronological journal. Add one entry for every ingest, query filed to the wiki, lint pass, migration, or schema change.
+- `wiki/log.md`: append-only chronological journal. Add one entry for every ingest, query filed to the wiki, lint pass, migration, or schema change. Every entry heading follows `## [YYYY-MM-DD] <type> | <Title>`, where `<type>` is one of `ingest`, `query`, `lint`, `schema`, or `migration`. This is the canonical log format; skills reference it rather than redefining it.
 - `wiki/sources/`: one page per raw source or external source.
 - `wiki/entities/`: people, organizations, projects, systems, tools, places, and other named things.
 - `wiki/topics/`: concepts, themes, processes, comparisons, and synthesized knowledge.
