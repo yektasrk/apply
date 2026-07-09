@@ -2,9 +2,9 @@
 
 ## Generation Boundary
 
-Codex must generate suitability decisions, rejection reasons, and cover-letter prose itself after reading the full job description, resume, and available performance-review evidence. Do not use scripts, local programs, external projects, scoring functions, or API generators to produce those outputs.
+You must generate suitability decisions, rejection reasons, and cover-letter prose yourself after reading the full job description, resume, and available performance-review evidence. Do not use scripts, local programs, external projects, scoring functions, or API generators to produce those outputs.
 
-Scripts and tools are allowed only for mechanical work: reading spreadsheet cells, writing spreadsheet cells, creating directories, saving Codex-authored text to files, checking file presence, checking word counts, or verifying sheet updates.
+Scripts and tools are allowed only for mechanical work: reading spreadsheet cells, writing spreadsheet cells, creating directories, saving text you authored to files, checking file presence, checking word counts, or verifying sheet updates.
 
 Do not decide from excerpts alone. If the spreadsheet is large, process a small batch at a time so the complete job description for each row being decided or drafted is present in context.
 

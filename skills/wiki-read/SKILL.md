@@ -1,6 +1,6 @@
 ---
 name: wiki-read
-description: Read and answer from a local Codex-maintained markdown wiki. Use when the user asks questions about accumulated wiki knowledge, wants cited answers from wiki pages, asks to inspect the wiki, or asks whether the wiki already contains information about a source, entity, topic, or previous query.
+description: Read and answer from a local agent-maintained markdown wiki. Use when the user asks questions about accumulated wiki knowledge, wants cited answers from wiki pages, asks to inspect the wiki, or asks whether the wiki already contains information about a source, entity, topic, or previous query.
 ---
 
 # Wiki Read

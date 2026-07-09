@@ -1,23 +1,23 @@
-# Codex Wiki Agent
+# Wiki Agent
 
 ## Purpose
 
-This workspace contains a Codex-maintained markdown wiki following the LLM-wiki pattern: raw sources are immutable, the wiki is the maintained knowledge layer, and this file is the schema that keeps future Codex sessions disciplined.
+This workspace contains an agent-maintained markdown wiki following the LLM-wiki pattern: raw sources are immutable, the wiki is the maintained knowledge layer, and this file is the schema that keeps future agent sessions disciplined. The rules here apply to whichever agent is running (Codex, Claude, or another tool).
 
 Use the wiki for accumulated knowledge that should outlive a chat thread: source summaries, entities, topics, recurring decisions, contradictions, query syntheses, and open questions.
 
 ## Workstation Skills
 
-Three Codex skills support this wiki and are mirrored in `.codex/skills/`:
+Three wiki skills support this wiki. They live canonically in `skills/` and are mirrored into `.codex/skills/` and `.claude/skills/` via `setup-agent-skills.sh`:
 
-- `$wiki-read`: answer questions from the wiki with cited page links.
-- `$wiki-maintain`: ingest sources, file durable answers, and update wiki pages.
-- `$wiki-evolve`: lint, repair, and improve the wiki schema or structure.
+- `wiki-read`: answer questions from the wiki with cited page links.
+- `wiki-maintain`: ingest sources, file durable answers, and update wiki pages.
+- `wiki-evolve`: lint, repair, and improve the wiki schema or structure.
 
 ## Directory Contract
 
 - `raw/`: user-curated source material. Read from this directory, but do not edit, rename, delete, or reorganize files in it unless the user explicitly asks. Use `raw/assets/` for source images and attachments.
-- `wiki/`: Codex-maintained markdown wiki. Codex may create and edit files here during wiki work.
+- `wiki/`: agent-maintained markdown wiki. The agent may create and edit files here during wiki work.
 - `wiki/index.md`: content-oriented catalog. Update this after every ingest, page creation, page rename, or substantial wiki edit.
 - `wiki/log.md`: append-only chronological journal. Add one entry for every ingest, query filed to the wiki, lint pass, migration, or schema change.
 - `wiki/sources/`: one page per raw source or external source.

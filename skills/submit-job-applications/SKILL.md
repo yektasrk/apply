@@ -1,6 +1,6 @@
 ---
 name: submit-job-applications
-description: Submit job applications from the local job finder Google Sheet for rows that are already marked Suitable or Yes, already have a cover_letter_path, and have not yet been applied to. Use when Codex is asked to apply to jobs, submit applications, fill job application forms, upload the resume, use existing cover letters, continue the sheet-to-application workflow in Chrome/browser automation, or keep trying bottom-to-top until an application succeeds. This skill opens job URLs, prefers company/website application forms over LinkedIn Easy Apply, handles multi-step forms, fills stable candidate details from the wiki profile, answers dynamic job-specific questions truthfully from resume/cover-letter evidence, uploads the PDF resume, submits the application when possible, writes an applied_at timestamp back to the sheet, and marks rows unsuitable or closed when the live application page reveals a disqualifying reason.
+description: Submit job applications from the local job finder Google Sheet for rows that are already marked Suitable or Yes, already have a cover_letter_path, and have not yet been applied to. Use when the agent is asked to apply to jobs, submit applications, fill job application forms, upload the resume, use existing cover letters, continue the sheet-to-application workflow in Chrome/browser automation, or keep trying bottom-to-top until an application succeeds. This skill opens job URLs, prefers company/website application forms over LinkedIn Easy Apply, handles multi-step forms, fills stable candidate details from the wiki profile, answers dynamic job-specific questions truthfully from resume/cover-letter evidence, uploads the PDF resume, submits the application when possible, writes an applied_at timestamp back to the sheet, and marks rows unsuitable or closed when the live application page reveals a disqualifying reason.
 ---
 
 # Submit Job Applications
@@ -13,7 +13,7 @@ Use this skill to turn suitable, cover-letter-ready sheet rows into submitted jo
 
 Before applying, read:
 
-- `the local repository/.codex/skills/triage-job-applications/references/current-sheet.md` for the current spreadsheet, tabs, headers, and timezone. This file is local-only; use `current-sheet.example.md` as the tracked template.
+- `the local repository/skills/triage-job-applications/references/current-sheet.md` for the current spreadsheet, tabs, headers, and timezone. This file is local-only; use `current-sheet.example.md` as the tracked template.
 - `the local repository/wiki/topics/job-application-form-defaults.md` for stable candidate details and fields that require user confirmation.
 - `the local repository/resume.md` for factual evidence.
 - The row's `cover_letter_path` file.

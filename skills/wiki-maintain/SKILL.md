@@ -1,6 +1,6 @@
 ---
 name: wiki-maintain
-description: Maintain a local Codex markdown wiki by ingesting sources, creating source summaries, updating entity and topic pages, preserving provenance, recording contradictions, refreshing the index, and appending the log. Use when the user asks to process a raw source, add material to the wiki, update wiki pages, file an answer, or keep the wiki current.
+description: Maintain a local agent-managed markdown wiki by ingesting sources, creating source summaries, updating entity and topic pages, preserving provenance, recording contradictions, refreshing the index, and appending the log. Use when the user asks to process a raw source, add material to the wiki, update wiki pages, file an answer, or keep the wiki current.
 ---
 
 # Wiki Maintain
