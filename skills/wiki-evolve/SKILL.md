@@ -20,18 +20,18 @@ Improve the wiki as a system: structure, consistency, provenance, links, schema,
 7. Look for contradictions or superseded claims, especially where newer sources conflict with older synthesis.
 8. Write findings and completed repairs to `wiki/meta/health.md`.
 9. Update `wiki/index.md` when statuses, page summaries, or page locations change.
-10. Append `wiki/log.md` with `## [YYYY-MM-DD] lint | Scope` or `## [YYYY-MM-DD] schema | Change`.
+10. Append a `wiki/log.md` entry of type `lint` or `schema`, using the canonical log format defined in `AGENTS.md`.
 
 ## Checks To Run
 
 - `wiki/index.md` lists every durable page with an accurate one-line summary.
-- Every non-template wiki page has frontmatter with `title`, `type`, `status`, `created`, `updated`, `sources`, and `tags`.
+- Every non-template wiki page has frontmatter with all fields required by the schema in `AGENTS.md`.
 - Source-backed claims link to source pages or raw files.
 - Pages with many outgoing references have useful incoming links.
 - No important page is isolated unless it is intentionally standalone.
 - Similar pages are linked, merged, or clearly distinguished.
 - `needs-review` and `superseded` pages have next actions.
-- Log headings follow `## [YYYY-MM-DD] type | Title`.
+- Log headings follow the canonical log format defined in `AGENTS.md`.
 
 ## Repair Rules
 

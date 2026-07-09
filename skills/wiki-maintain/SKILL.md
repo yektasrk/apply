@@ -20,7 +20,7 @@ Integrate new information into the wiki as compiled knowledge. Do not merely sum
 7. Mark contradictions, superseded claims, and uncertain claims where they belong.
 8. Add Obsidian-style wikilinks for important wiki concepts and entities.
 9. Update `wiki/index.md` with new or changed pages.
-10. Append `wiki/log.md` with `## [YYYY-MM-DD] ingest | Source Title` or the appropriate operation type.
+10. Append a `wiki/log.md` entry of type `ingest` (or the appropriate operation type), using the canonical log format defined in `AGENTS.md`.
 
 ## Source Rules
 

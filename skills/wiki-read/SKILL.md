@@ -35,4 +35,4 @@ If the answer creates durable synthesis, ask whether to file it unless the user 
 
 - Store a new durable answer in `wiki/queries/` or merge it into the most relevant `wiki/topics/` page.
 - Update `wiki/index.md`.
-- Append `wiki/log.md` with `## [YYYY-MM-DD] query | Query Title`.
+- Append a `wiki/log.md` entry of type `query`, using the canonical log format defined in `AGENTS.md`.

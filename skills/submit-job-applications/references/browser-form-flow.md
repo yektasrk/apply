@@ -10,9 +10,9 @@ Use the same loop for single-page and multi-step application forms:
 4. Click the safest advancing control: `Next`, `Continue`, `Save and continue`, `Apply`, or `Submit application`.
 5. After navigation or DOM changes, inspect the new state before entering more data.
 6. If validation errors appear, fix fields only when the correct value is known from the approved sources.
-7. Continue until a confirmation page, email-confirmation message, or submitted-state screen appears.
+7. Continue until the form is fully filled and the next control would finalize the application, then stop for the review gate defined in SKILL.md. Click the final submit only after the user approves (or asked up front to skip review), and then wait for a confirmation page, email-confirmation message, or submitted-state screen.
 
-Do not treat an intermediate `Next` click as a submission. Only write `applied_at` after the site confirms the final application was submitted.
+Do not treat an intermediate `Next` click as a submission, and do not treat reaching the final page as done. Only write `applied_at` after the user approved the submit and the site confirms the final application was submitted. If it is unclear whether a button advances a step or finalizes the application, treat it as final and pause for review first.
 
 ## Data Sources
 
@@ -28,21 +28,22 @@ For dynamic free-text questions:
 ## Common Field Handling
 
 - Name, email, LinkedIn, education, current role, and current employer: use the wiki defaults.
-- Resume/CV upload: upload `the local repository/the local CV file`.
+- Resume/CV upload: upload `the local CV file` from the repo root.
 - Cover letter text: paste the row's cover letter content as plain text. If the source is Markdown, remove Markdown headings only if they are formatting artifacts; preserve the letter text. If the source is PDF, extract the text before pasting.
 - Cover letter file upload: upload the existing PDF when `cover_letter_path` points to one. If the site requires PDF/DOC upload and the cover letter is Markdown, create a simple PDF derivative next to the Markdown file and upload that derivative.
 - Country/location fields: use only the stable default current location unless the form is asking for target job location.
-- Work authorization, sponsorship, visa, notice period, salary, phone, street address, and demographic fields: use the wiki defaults when present; otherwise stop the row if required.
+- Work authorization, sponsorship, visa, notice period, salary, phone, street address, and demographic fields: use the wiki defaults when present; otherwise fill the rest of the form, leave it open, and ask the user for the missing value per the unknown-field blocker flow in SKILL.md.
 - Optional unknown fields: leave blank when the form allows it.
 - Equal-opportunity fields: prefer `Prefer not to answer` or equivalent when available and when the wiki does not define a more specific answer.
 
 ## Blockers
 
-Leave `applied_at` blank and record a concise blocker in `application_notes` when:
+A required field that merely lacks a stable default is not a recorded blocker: fill everything else and ask the user (see the unknown-field blocker flow in SKILL.md).
+
+Leave `applied_at` blank and record a concise blocker in `application_notes` when the row cannot proceed even with a user answer:
 
 - The posting is closed, removed, or impossible to access.
 - The site requires a login or account creation that is not already available in the browser session.
-- A required personal/legal field lacks a stable default.
 - A CAPTCHA, bot challenge, payment, or nonstandard consent blocks submission.
 - The form requires a document type that cannot be produced safely from available files.
 - The final submit button would attest to something unsupported or false.
