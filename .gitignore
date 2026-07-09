@@ -15,6 +15,9 @@ config_local.py
 service_account.json
 skills/triage-job-applications/references/current-sheet.md
 
+# Agent session working notes (durable lessons belong in AGENTS.md, skills, or the wiki)
+tasks/
+
 # Personal candidate data and generated application artifacts
 resume.md
 CV - Yekta Sarkamari.pdf
