@@ -13,7 +13,7 @@ job finder
 !.env.example
 config_local.py
 service_account.json
-.codex/skills/triage-job-applications/references/current-sheet.md
+skills/triage-job-applications/references/current-sheet.md
 
 # Personal candidate data and generated application artifacts
 resume.md

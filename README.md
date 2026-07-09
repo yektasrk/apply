@@ -22,8 +22,12 @@ apply/
 │   ├── telegram_bot.py         # Telegram notification helper
 │   └── retries.py              # Shared retry policy
 ├── .github/workflows/          # Scheduled and manual GitHub Actions runs
-├── .codex/skills/              # Project-specific Codex skills
-├── AGENTS.md                   # Workspace rules for Codex/wiki work
+├── skills/                     # Canonical tool-neutral agent skills
+├── .codex/skills/              # Codex discovery mirror (symlinks into skills/)
+├── .claude/skills/             # Claude discovery mirror (symlinks into skills/)
+├── AGENTS.md                   # Shared workspace rules for agent/wiki work
+├── CLAUDE.md                   # Claude-specific notes (imports AGENTS.md)
+├── setup-agent-skills.sh       # Rebuilds both per-tool skill mirrors
 ├── serve_wiki.py               # Local wiki preview server
 ├── requirements.txt
 ├── .env.example
@@ -181,12 +185,15 @@ HTTP 429 responses; the checker defaults this to 300 seconds.
 
 ## Local Knowledge Base
 
-This workspace also supports a Codex-maintained local wiki:
+This workspace also supports an agent-maintained local wiki:
 
 - `raw/` stores immutable source material.
 - `wiki/` stores maintained markdown knowledge.
 - `cover_letters/` stores generated application material.
 
 These folders are ignored by Git because they contain personal candidate data.
-Project instructions and reusable Codex skills are tracked in `AGENTS.md` and
-`.codex/skills/`.
+Project instructions and reusable agent skills are tracked in `AGENTS.md` and
+`skills/`. The workspace works with both Codex and Claude: `AGENTS.md` is the
+shared contract, `CLAUDE.md` adds Claude-specific notes, and
+`setup-agent-skills.sh` mirrors the canonical `skills/` into `.codex/skills/`
+and `.claude/skills/` so each tool discovers them from its own directory.

@@ -1,6 +1,6 @@
 ---
 name: wiki-evolve
-description: Audit, repair, and evolve a local Codex-maintained markdown wiki. Use when the user asks for a wiki health check, lint pass, broken-link scan, orphan detection, contradiction review, taxonomy cleanup, schema improvement, migration, or recommendations for making the wiki more useful over time.
+description: Audit, repair, and evolve a local agent-maintained markdown wiki. Use when the user asks for a wiki health check, lint pass, broken-link scan, orphan detection, contradiction review, taxonomy cleanup, schema improvement, migration, or recommendations for making the wiki more useful over time.
 ---
 
 # Wiki Evolve
