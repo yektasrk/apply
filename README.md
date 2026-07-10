@@ -131,6 +131,9 @@ Sheets URL with `gid=...`, it checks that tab unless you also pass `--country`,
 `--tab`, or `--gid`. When a job URL is clearly closed, it writes `Closed` to
 `job_status`, including rows currently marked `Suitable` or `Not Suitable`. It
 leaves applied/rejected terminal statuses alone unless run with `--force`.
+Pending status changes are flushed after every 100 checked jobs by default, then
+once more for the final partial batch. Use `--write-batch-size` to change the
+checkpoint size.
 
 Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
 `ireland`, `sweden`, `switzerland`, `portugal`, and `france`.
@@ -175,6 +178,7 @@ Optional repository variables:
 AVAILABILITY_CHECK_LIMIT
 AVAILABILITY_CHECK_SLEEP
 AVAILABILITY_RATE_LIMIT_COOLDOWN
+AVAILABILITY_WRITE_BATCH_SIZE
 ```
 
 Use `AVAILABILITY_CHECK_LIMIT` to cap the number of existing rows checked per
@@ -182,6 +186,8 @@ run. Use `AVAILABILITY_CHECK_SLEEP` to control the delay between URL checks; the
 GitHub Actions workflow defaults this to 3 seconds when the variable is unset.
 Use `AVAILABILITY_RATE_LIMIT_COOLDOWN` to override the per-host cooldown after
 HTTP 429 responses; the checker defaults this to 300 seconds.
+Use `AVAILABILITY_WRITE_BATCH_SIZE` to control how many checked jobs each
+write checkpoint covers; the workflow defaults this to 100.
 
 ## Local Knowledge Base
 
