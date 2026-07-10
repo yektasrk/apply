@@ -41,6 +41,7 @@ URL_COLUMN = "job_url"
 CLOSED_VALUE = "Closed"
 DEFAULT_RATE_LIMIT_COOLDOWN = 300
 MAX_RATE_LIMIT_COOLDOWN = 1800
+DEFAULT_WRITE_BATCH_SIZE = 100
 
 OVERWRITABLE_STATUSES = {
     "",
@@ -404,6 +405,35 @@ def _can_overwrite(status: str, force: bool) -> bool:
     return _normalise_status(status) in OVERWRITABLE_STATUSES
 
 
+def _flush_updates(
+    ws: gspread.Worksheet,
+    args: argparse.Namespace,
+    updates: list[dict],
+    counts: dict[str, int],
+) -> None:
+    if not updates:
+        return
+
+    batch_size = len(updates)
+    if args.dry_run:
+        log.info(
+            "%s: dry run; would update %d row(s) in this batch",
+            ws.title,
+            batch_size,
+        )
+    else:
+        ws.batch_update(updates, value_input_option="RAW")
+        log.info(
+            "%s: updated %d row(s) to %s in this batch",
+            ws.title,
+            batch_size,
+            args.closed_value,
+        )
+
+    counts["updated"] += batch_size
+    updates.clear()
+
+
 def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[str, int]:
     values = ws.get_all_values()
     if not values:
@@ -482,23 +512,15 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
                 }
             )
 
+        if counts["checked"] % args.write_batch_size == 0:
+            _flush_updates(ws, args, updates, counts)
+
         if args.limit and counts["checked"] >= args.limit:
             break
         if args.sleep:
             time.sleep(args.sleep)
 
-    if updates:
-        counts["updated"] = len(updates)
-        if args.dry_run:
-            log.info("%s: dry run; would update %d row(s)", ws.title, len(updates))
-        else:
-            ws.batch_update(updates, value_input_option="RAW")
-            log.info(
-                "%s: updated %d row(s) to %s",
-                ws.title,
-                len(updates),
-                args.closed_value,
-            )
+    _flush_updates(ws, args, updates, counts)
 
     return counts
 
@@ -544,6 +566,12 @@ def main() -> None:
         help="Cooldown per host after HTTP 429, in seconds",
     )
     parser.add_argument(
+        "--write-batch-size",
+        type=int,
+        default=DEFAULT_WRITE_BATCH_SIZE,
+        help="Flush pending sheet updates after this many checked jobs",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Report rows that would be marked without editing",
@@ -559,6 +587,9 @@ def main() -> None:
         help="Value to write into job_status",
     )
     args = parser.parse_args()
+
+    if args.write_batch_size < 1:
+        parser.error("--write-batch-size must be at least 1")
 
     if args.sheet:
         config.GOOGLE_SHEET_ID = _extract_sheet_id(args.sheet)

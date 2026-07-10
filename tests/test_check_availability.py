@@ -1,10 +1,13 @@
 import unittest
 import urllib.error
+from argparse import Namespace
 from unittest import mock
 
 from job_finder.check_availability import (
+    Availability,
     LINKEDIN_CONFIRMED_CLOSED_REASON,
     LINKEDIN_EMPTY_ACTION_REASON,
+    _check_worksheet,
     _classify_response,
     check_job_url,
 )
@@ -85,6 +88,85 @@ class CheckJobUrlTests(unittest.TestCase):
         )
 
         self.assertEqual(availability.state, "active")
+
+
+class FakeWorksheet:
+    title = "United Kingdom"
+
+    def __init__(self, values: list[list[str]]) -> None:
+        self.values = values
+        self.batch_updates: list[list[dict]] = []
+
+    def get_all_values(self) -> list[list[str]]:
+        return self.values
+
+    def batch_update(self, updates: list[dict], value_input_option: str) -> None:
+        self.assert_raw(value_input_option)
+        self.batch_updates.append([dict(update) for update in updates])
+
+    @staticmethod
+    def assert_raw(value_input_option: str) -> None:
+        if value_input_option != "RAW":
+            raise AssertionError(f"unexpected value input option: {value_input_option}")
+
+
+def _worksheet_args(*, dry_run: bool, write_batch_size: int) -> Namespace:
+    return Namespace(
+        closed_value="Closed",
+        dry_run=dry_run,
+        force=False,
+        limit=0,
+        rate_limit_cooldown=60,
+        sleep=0,
+        timeout=15,
+        write_batch_size=write_batch_size,
+    )
+
+
+class CheckWorksheetTests(unittest.TestCase):
+    @mock.patch("job_finder.check_availability.check_job_url")
+    def test_writes_pending_updates_after_each_checked_batch(self, check_url) -> None:
+        check_url.return_value = Availability("closed", "test closure")
+        worksheet = FakeWorksheet(
+            [["job_status", "title", "job_url"]]
+            + [
+                ["Not Suitable", f"Job {number}", f"https://example.com/{number}"]
+                for number in range(1, 6)
+            ]
+        )
+
+        counts = _check_worksheet(
+            worksheet,
+            _worksheet_args(dry_run=False, write_batch_size=2),
+        )
+
+        self.assertEqual([len(batch) for batch in worksheet.batch_updates], [2, 2, 1])
+        self.assertEqual(
+            [[update["range"] for update in batch] for batch in worksheet.batch_updates],
+            [["A2", "A3"], ["A4", "A5"], ["A6"]],
+        )
+        self.assertEqual(counts["checked"], 5)
+        self.assertEqual(counts["updated"], 5)
+
+    @mock.patch("job_finder.check_availability.check_job_url")
+    def test_dry_run_counts_batches_without_writing(self, check_url) -> None:
+        check_url.return_value = Availability("closed", "test closure")
+        worksheet = FakeWorksheet(
+            [
+                ["job_status", "title", "job_url"],
+                ["Suitable", "Job 1", "https://example.com/1"],
+                ["Suitable", "Job 2", "https://example.com/2"],
+                ["Suitable", "Job 3", "https://example.com/3"],
+            ]
+        )
+
+        counts = _check_worksheet(
+            worksheet,
+            _worksheet_args(dry_run=True, write_batch_size=2),
+        )
+
+        self.assertEqual(worksheet.batch_updates, [])
+        self.assertEqual(counts["updated"], 3)
 
 
 if __name__ == "__main__":

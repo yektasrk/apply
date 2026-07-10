@@ -134,8 +134,13 @@ jobs:
           AVAILABILITY_CHECK_LIMIT: ${{ vars.AVAILABILITY_CHECK_LIMIT }}
           AVAILABILITY_CHECK_SLEEP: ${{ vars.AVAILABILITY_CHECK_SLEEP }}
           AVAILABILITY_RATE_LIMIT_COOLDOWN: ${{ vars.AVAILABILITY_RATE_LIMIT_COOLDOWN }}
+          AVAILABILITY_WRITE_BATCH_SIZE: ${{ vars.AVAILABILITY_WRITE_BATCH_SIZE }}
         run: |
-          args=(--country "${{ needs.resolve-country.outputs.country }}" --sleep "${AVAILABILITY_CHECK_SLEEP:-3}")
+          args=(
+            --country "${{ needs.resolve-country.outputs.country }}"
+            --sleep "${AVAILABILITY_CHECK_SLEEP:-3}"
+            --write-batch-size "${AVAILABILITY_WRITE_BATCH_SIZE:-100}"
+          )
           if [ -n "${AVAILABILITY_CHECK_LIMIT:-}" ]; then
             args+=(--limit "$AVAILABILITY_CHECK_LIMIT")
           fi
