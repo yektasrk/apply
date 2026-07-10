@@ -18,13 +18,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SKILLS=(
-  wiki-read
-  wiki-maintain
-  wiki-evolve
-  triage-job-applications
-  submit-job-applications
-)
+# Auto-discover every skill folder (a dir under skills/ containing SKILL.md),
+# so adding a new skill needs no edit here — just re-run this script.
+SKILLS=()
+for skill_md in skills/*/SKILL.md; do
+  [ -f "$skill_md" ] || continue
+  SKILLS+=("$(basename "$(dirname "$skill_md")")")
+done
 
 TOOL_DIRS=(
   .codex/skills

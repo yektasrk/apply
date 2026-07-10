@@ -18,6 +18,9 @@ skills/triage-job-applications/references/current-sheet.md
 # Agent session working notes (durable lessons belong in AGENTS.md, skills, or the wiki)
 tasks/
 
+# report-job-market scratch (default OUT_DIR for its pull/render scripts)
+.report_tmp/
+
 # Personal candidate data and generated application artifacts
 resume.md
 the local CV file
