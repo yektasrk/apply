@@ -67,6 +67,16 @@ CLOSED_PHRASES = (
 )
 
 LINKEDIN_JOB_PATH_RE = re.compile(r"/jobs/(?:view|collections/.+?/jobs)/([^/?#]+)")
+LINKEDIN_JOB_PAGE_MARKER = 'data-semaphore-content-type="job"'
+LINKEDIN_CTA_CONTAINER_RE = re.compile(
+    r'<div\b[^>]*\bclass="[^"]*top-card-layout__cta-container[^"]*"[^>]*>'
+    r"(.*?)</div>",
+    re.DOTALL,
+)
+LINKEDIN_EMPTY_ACTION_REASON = "LinkedIn posting has an empty action area"
+LINKEDIN_CONFIRMED_CLOSED_REASON = (
+    "LinkedIn posting has an empty action area in both public responses"
+)
 SHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9_-]+)")
 SHEET_GID_RE = re.compile(r"[?&#]gid=(\d+)")
 
@@ -127,6 +137,41 @@ def _extract_sheet_gid(value: str) -> int | None:
     if match:
         return int(match.group(1))
     return None
+
+
+def _linkedin_job_has_empty_action_area(
+    body: str,
+    original_url: str,
+    final_url: str,
+) -> bool:
+    """Return whether LinkedIn rendered a verified job with no action controls."""
+    original_host = urllib.parse.urlparse(original_url).hostname or ""
+    final_host = urllib.parse.urlparse(final_url).hostname or ""
+    if not (
+        (original_host == "linkedin.com" or original_host.endswith(".linkedin.com"))
+        and (final_host == "linkedin.com" or final_host.endswith(".linkedin.com"))
+    ):
+        return False
+
+    original_job_id = _extract_linkedin_job_id(original_url)
+    final_job_id = _extract_linkedin_job_id(final_url)
+    if not original_job_id or final_job_id != original_job_id:
+        return False
+
+    job_marker = f'urn:li:jobposting:{original_job_id}'
+    is_linkedin_job_page = (
+        LINKEDIN_JOB_PAGE_MARKER in body
+        and job_marker in body
+    )
+    if not is_linkedin_job_page:
+        return False
+
+    match = LINKEDIN_CTA_CONTAINER_RE.search(body)
+    if not match:
+        return False
+
+    action_html = re.sub(r"<!--.*?-->", "", match.group(1), flags=re.DOTALL)
+    return not action_html.strip()
 
 
 def _url_host(url: str) -> str:
@@ -210,6 +255,9 @@ def _classify_response(
     if phrase:
         return Availability("closed", f"matched phrase: {phrase!r}")
 
+    if _linkedin_job_has_empty_action_area(body, original_url, final_url):
+        return Availability("unknown", LINKEDIN_EMPTY_ACTION_REASON)
+
     original_linkedin_id = _extract_linkedin_job_id(original_url)
     final_linkedin_id = _extract_linkedin_job_id(final_url)
     if (
@@ -243,6 +291,7 @@ def check_job_url(
 
     last_closed: Availability | None = None
     last_unknown: Availability | None = None
+    linkedin_empty_action_responses = 0
     for candidate_url in urls_to_try:
         host = _url_host(candidate_url)
         remaining = _cooldown_remaining(host, rate_limit_cooldowns)
@@ -287,7 +336,16 @@ def check_job_url(
         if availability.state == "closed":
             last_closed = availability
             continue
+        if availability.reason == LINKEDIN_EMPTY_ACTION_REASON:
+            linkedin_empty_action_responses += 1
         last_unknown = availability
+
+    if (
+        linkedin_job_id
+        and len(urls_to_try) == 2
+        and linkedin_empty_action_responses == len(urls_to_try)
+    ):
+        return Availability("closed", LINKEDIN_CONFIRMED_CLOSED_REASON)
 
     return last_closed or last_unknown or Availability(
         "unknown",
