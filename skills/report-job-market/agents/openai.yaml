@@ -1,0 +1,4 @@
+interface:
+  display_name: "Report Job Market"
+  short_description: "Aggregate triaged jobs into a wiki fit/skills report"
+  default_prompt: "Use $report-job-market to build a wiki report of suitability reasons, in-demand skills, and my learning backlog from the triaged rows in my job sheet."
