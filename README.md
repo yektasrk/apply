@@ -101,6 +101,13 @@ PROXIES=
 `SEARCH_TERMS` and `PROXIES` are comma-separated lists. Use `JOB_TYPE=` to pass
 no job type filter.
 
+After scraping and deduplicating, the job finder pre-marks titles containing a
+configured whole-word keyword such as `AWS`, `Staff`, `Consultant`, `MLOps`, or
+`Microsoft` as `Not Suitable`, with `title missmatch` in
+`suitability_reason`. These rows are still written to the sheet so the filter
+decision remains visible. The full list is configured in
+`job_finder/config.py` as `TITLE_MISMATCH_KEYWORDS`.
+
 ## Run Locally
 
 Scrape one configured country:

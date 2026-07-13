@@ -31,12 +31,14 @@ SHEET_COLUMNS = [
     "date_posted",
     "job_url",
     "description",
+    "cover_letter_path",
+    "suitability_reason",
+    "applied_at",
+    "application_notes",
 ]
 
 DEDUP_COLUMN = "job_url"
-EXPECTED_COLUMNS = ["scraped_at"] + SHEET_COLUMNS
 ROW_MARKER_COLUMNS = ("scraped_at", "title", "job_url")
-ROW_MARKER_INDICES = [EXPECTED_COLUMNS.index(column) for column in ROW_MARKER_COLUMNS]
 
 
 def get_spreadsheet() -> gspread.Spreadsheet:
@@ -56,10 +58,21 @@ def get_worksheet() -> gspread.Worksheet:
     return sheet.worksheet(config.GOOGLE_SHEET_TAB)
 
 
-def ensure_header(ws: gspread.Worksheet) -> None:
+def ensure_header(ws: gspread.Worksheet) -> list[str]:
+    """Validate the fixed sheet schema and return the worksheet's header order."""
     if ws.row_count == 0 or ws.cell(1, 1).value is None:
         ws.append_row(["scraped_at"] + SHEET_COLUMNS, value_input_option="RAW")
         log.info("Header row written.")
+        return ["scraped_at"] + SHEET_COLUMNS
+
+    headers = [str(value).strip() for value in ws.row_values(1)]
+    missing = [column for column in SHEET_COLUMNS if column not in headers]
+    if missing:
+        raise RuntimeError(
+            f"Worksheet '{ws.title}' is missing required column(s): {', '.join(missing)}. "
+            "Run the one-time sheet schema migration before scraping."
+        )
+    return headers
 
 
 @retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
@@ -67,7 +80,12 @@ def get_existing_urls(ws: gspread.Worksheet) -> set[str]:
     all_values = ws.get_all_values()
     if len(all_values) < 2:
         return set()
-    url_col_index = EXPECTED_COLUMNS.index(DEDUP_COLUMN)
+    headers = [str(value).strip() for value in all_values[0]]
+    try:
+        url_col_index = headers.index(DEDUP_COLUMN)
+    except ValueError:
+        log.warning("Sheet is missing required '%s' column.", DEDUP_COLUMN)
+        return set()
     existing = {
         row[url_col_index].strip()
         for row in all_values[1:]
@@ -77,27 +95,35 @@ def get_existing_urls(ws: gspread.Worksheet) -> set[str]:
     return existing
 
 
-def _build_rows(df: pd.DataFrame) -> list[list]:
+def _build_rows(df: pd.DataFrame, headers: list[str]) -> list[list]:
     """Convert a cleaned DataFrame to sheet rows with a scraped_at prefix."""
     scraped_at = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
-    return [[scraped_at] + row.tolist() for _, row in df.iterrows()]
+    columns = [column for column in headers if column != "scraped_at"]
+    aligned = df.reindex(columns=columns, fill_value="")
+    return [[scraped_at] + row.tolist() for _, row in aligned.iterrows()]
 
 
-def _is_empty_job_row(row: list[str]) -> bool:
-    return not any(
-        len(row) > index and str(row[index]).strip()
-        for index in ROW_MARKER_INDICES
-    )
-
-
-def _find_empty_rows(all_values: list[list[str]], row_count: int, size: int) -> list[int]:
+def _find_empty_rows(
+    all_values: list[list[str]],
+    row_count: int,
+    size: int,
+    headers: list[str],
+) -> list[int]:
     """Return row numbers for the earliest empty job rows."""
+    marker_indices = [
+        headers.index(column)
+        for column in ROW_MARKER_COLUMNS
+        if column in headers
+    ]
     rows: list[int] = []
     last_grid_row = max(len(all_values), row_count, 1)
 
     for row_num in range(2, last_grid_row + 1):
         row = all_values[row_num - 1] if row_num <= len(all_values) else []
-        if _is_empty_job_row(row):
+        if not any(
+            len(row) > index and str(row[index]).strip()
+            for index in marker_indices
+        ):
             rows.append(row_num)
             if len(rows) == size:
                 return rows
@@ -109,12 +135,12 @@ def _find_empty_rows(all_values: list[list[str]], row_count: int, size: int) -> 
     return rows
 
 
-def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
+def _write_rows(ws: gspread.Worksheet, rows: list[list], headers: list[str]) -> None:
     """Expand the grid if needed, then write rows into the earliest empty rows."""
     @retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
     def _do_write() -> None:
         all_values = ws.get_all_values()
-        target_rows = _find_empty_rows(all_values, ws.row_count, len(rows))
+        target_rows = _find_empty_rows(all_values, ws.row_count, len(rows), headers)
         needed_rows = max(target_rows)
         if needed_rows > ws.row_count:
             ws.resize(rows=needed_rows + 100)
@@ -142,8 +168,6 @@ def _write_rows(ws: gspread.Worksheet, rows: list[list]) -> None:
 def _prepare_df(jobs: pd.DataFrame) -> pd.DataFrame:
     """Normalise a jobs DataFrame to exactly SHEET_COLUMNS."""
     df = jobs.copy()
-    df["job_status"] = ""
-    df["application_result"] = ""
     for col in SHEET_COLUMNS:
         if col not in df.columns:
             df[col] = ""
@@ -160,7 +184,7 @@ def push_jobs(jobs: pd.DataFrame) -> tuple[int, int, pd.DataFrame]:
         return 0, 0, pd.DataFrame()
 
     ws = get_worksheet()
-    ensure_header(ws)
+    headers = ensure_header(ws)
 
     existing_urls = get_existing_urls(ws)
     df = _prepare_df(jobs)
@@ -175,7 +199,7 @@ def push_jobs(jobs: pd.DataFrame) -> tuple[int, int, pd.DataFrame]:
         log.info("No new jobs to write — all duplicates.")
         return 0, skipped, df
 
-    _write_rows(ws, _build_rows(df))
+    _write_rows(ws, _build_rows(df, headers), headers)
     return len(df), skipped, df
 
 
@@ -185,7 +209,7 @@ def push_single(job: pd.Series) -> bool:
     Returns True if written, False if it was a duplicate.
     """
     ws = get_worksheet()
-    ensure_header(ws)
+    headers = ensure_header(ws)
 
     job_url = str(job.get("job_url") or "")
     if job_url in get_existing_urls(ws):
@@ -193,5 +217,5 @@ def push_single(job: pd.Series) -> bool:
         return False
 
     df = _prepare_df(pd.DataFrame([job]))
-    _write_rows(ws, _build_rows(df))
+    _write_rows(ws, _build_rows(df, headers), headers)
     return True

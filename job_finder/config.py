@@ -99,6 +99,23 @@ REMOTE_ONLY = _env_flag("REMOTE_ONLY", False)
 JOB_TYPE = os.getenv("JOB_TYPE", "fulltime") or None
 FETCH_DESCRIPTION = _env_flag("FETCH_DESCRIPTION", True)
 
+# Jobs with any of these whole-word/phrase matches in the title are kept in
+# the sheet for visibility, but pre-marked as unsuitable before manual triage.
+TITLE_MISMATCH_KEYWORDS: tuple[str, ...] = (
+    "AWS",
+    "Azure",
+    "Chief",
+    "Staff",
+    "Consultant",
+    "Data Center",
+    "MLOps",
+    "Openstack",
+    "OpenShift",
+    "Windows",
+    "Microsoft",
+)
+TITLE_MISMATCH_REASON = "title missmatch"
+
 PROXIES: list[str] = _env_list("PROXIES", [])
 
 GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv(

@@ -3,6 +3,7 @@ scraper.py — LinkedIn scraping logic (shared by main.py and add_job.py)
 """
 
 import logging
+import re
 
 import pandas as pd
 from jobspy import scrape_jobs
@@ -13,6 +14,21 @@ from . import config
 from .retries import RETRY
 
 log = logging.getLogger(__name__)
+
+
+def _build_title_pattern(keywords: tuple[str, ...]) -> re.Pattern[str]:
+    """Build a case-insensitive pattern for whole-word keyword/phrase matches."""
+    alternatives = []
+    for keyword in keywords:
+        words = [re.escape(word) for word in keyword.split()]
+        alternatives.append(r"\s+".join(words))
+    return re.compile(
+        rf"(?<!\w)(?:{'|'.join(alternatives)})(?!\w)",
+        re.IGNORECASE,
+    )
+
+
+TITLE_MISMATCH_PATTERN = _build_title_pattern(config.TITLE_MISMATCH_KEYWORDS)
 
 _original_get_job_details = LinkedIn._get_job_details
 
@@ -26,6 +42,33 @@ def _get_job_details_with_defaults(self: LinkedIn, job_id: str) -> dict:
 
 
 LinkedIn._get_job_details = _get_job_details_with_defaults
+
+
+def mark_title_mismatches(jobs: pd.DataFrame) -> pd.DataFrame:
+    """Pre-mark jobs whose title contains a configured disqualifying keyword."""
+    if jobs.empty:
+        return jobs.copy()
+
+    marked = jobs.copy()
+    marked["job_status"] = marked.get("job_status", "")
+    marked["suitability_reason"] = marked.get("suitability_reason", "")
+
+    if "title" not in marked.columns:
+        return marked
+
+    titles = marked["title"].fillna("").astype(str)
+    mismatch = titles.str.contains(TITLE_MISMATCH_PATTERN, na=False)
+    marked.loc[mismatch, "job_status"] = "Not Suitable"
+    marked.loc[mismatch, "suitability_reason"] = config.TITLE_MISMATCH_REASON
+
+    count = int(mismatch.sum())
+    if count:
+        log.info(
+            "Pre-marked %d job(s) as Not Suitable: %s.",
+            count,
+            config.TITLE_MISMATCH_REASON,
+        )
+    return marked
 
 
 @retry(**RETRY, retry=retry_if_exception_type(Exception))
@@ -78,6 +121,7 @@ def scrape_all_terms() -> pd.DataFrame:
     if dupes:
         log.info("Dropped %d cross-term duplicate(s).", dupes)
 
+    combined = mark_title_mismatches(combined)
     log.info("Total unique jobs scraped: %d.", len(combined))
     return combined
 
@@ -89,7 +133,7 @@ def scrape_single_url(url: str) -> pd.Series:
     jobs = _scrape_by_id(job_id)
     if jobs.empty:
         raise RuntimeError(f"No job data returned for URL: {url}")
-    return jobs.iloc[0]
+    return mark_title_mismatches(jobs).iloc[0]
 
 
 def _extract_job_id(url: str) -> str:
