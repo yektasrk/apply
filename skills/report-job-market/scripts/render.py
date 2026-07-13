@@ -33,14 +33,19 @@ CAT_LABEL = {
     "other": "Other",
 }
 LANGS = ["german", "french", "dutch", "swedish", "danish", "portuguese", "spanish", "italian"]
-# Candidate-specific skills are supplied at runtime and are intentionally not
-# committed. Set RESUME_SKILLS as a comma-separated environment variable when
-# generating a private report.
-RESUME_SKILLS = {
-    skill.strip()
-    for skill in os.getenv("RESUME_SKILLS", "").split(",")
-    if skill.strip()
-}
+def _load_resume_skills():
+    """Load private skill facts locally without committing them."""
+    configured = os.getenv("RESUME_SKILLS", "")
+    if configured:
+        return {skill.strip() for skill in configured.split(",") if skill.strip()}
+    try:
+        from config_local import RESUME_SKILLS as local_skills
+    except (ImportError, AttributeError):
+        return set()
+    return set(local_skills)
+
+
+RESUME_SKILLS = _load_resume_skills()
 
 
 def load(name):
