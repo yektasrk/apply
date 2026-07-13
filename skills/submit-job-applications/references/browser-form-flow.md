@@ -30,7 +30,7 @@ For dynamic free-text questions:
 Answer exactly what each field asks; do not volunteer information the field did not request. A "Where are you located?" field gets only the location — sponsorship, relocation, or availability details belong only in fields that explicitly ask about them.
 
 - Name, email, LinkedIn, education, current role, and current employer: use the wiki defaults.
-- Resume/CV upload: upload `the local CV file` from the repo root.
+- Resume/CV upload: upload the user's local resume or CV file.
 - Cover letter text: paste the row's cover letter content as plain text. If the source is Markdown, remove Markdown headings only if they are formatting artifacts; preserve the letter text. If the source is PDF, extract the text before pasting.
 - Cover letter file upload: upload the existing PDF when `cover_letter_path` points to one. If the site requires PDF/DOC upload and the cover letter is Markdown, create a simple PDF derivative next to the Markdown file and upload that derivative.
 - Country/location fields: use only the stable default current location unless the form is asking for target job location.

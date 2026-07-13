@@ -19,7 +19,7 @@ Before applying, read (paths relative to the repo root):
 - The row's `cover_letter_path` file.
 - [browser-form-flow.md](references/browser-form-flow.md) before operating a web form.
 
-Use `the local CV file` at the repo root whenever a form asks for a resume or CV upload.
+Use the user's local resume or CV file whenever a form asks for a resume or CV upload.
 
 ## Candidate Rows
 

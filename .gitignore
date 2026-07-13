@@ -23,7 +23,7 @@ tasks/
 
 # Personal candidate data and generated application artifacts
 resume.md
-the local CV file
+CV*.pdf
 raw/
 wiki/
 cover_letters/
