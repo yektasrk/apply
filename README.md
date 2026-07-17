@@ -8,6 +8,11 @@ The tracked Python app lives in `job_finder/`. Personal data such as CVs, raw
 evidence, the maintained wiki, generated cover letters, `.env`, and Google
 service account keys are intentionally ignored.
 
+The project covers the complete flow from job discovery to application: scheduled
+scraping feeds a shared Google Sheet, agent skills triage the rows and write
+tailored cover letters, and the application skill fills forms while pausing
+before the final submission for user review.
+
 ## Repository Contents
 
 ```text
@@ -25,6 +30,7 @@ apply/
 ├── skills/                     # Canonical tool-neutral agent skills
 ├── .codex/skills/              # Codex discovery mirror (symlinks into skills/)
 ├── .claude/skills/             # Claude discovery mirror (symlinks into skills/)
+├── tests/                      # Scraper and availability-check tests
 ├── AGENTS.md                   # Shared workspace rules for agent/wiki work
 ├── CLAUDE.md                   # Claude-specific notes (imports AGENTS.md)
 ├── setup-agent-skills.sh       # Rebuilds both per-tool skill mirrors
@@ -146,6 +152,38 @@ checkpoint size.
 Supported country keys are currently `netherlands`, `germany`, `uk`, `denmark`,
 `ireland`, `sweden`, `switzerland`, `portugal`, and `france`.
 
+The runtime requirements do not include the optional test runner. Install it
+once if needed, then run the automated tests from the repository root:
+
+```bash
+python -m pip install pytest
+python -m pytest tests -q
+```
+
+The availability checker only marks a row `Closed` when it finds a recognized
+closed-posting signal. It skips rows already marked `Applied`, protects other
+terminal statuses by default, supports dry runs, and flushes changes to Sheets
+in configurable batches. Use `--force` only when intentionally overriding a
+protected non-`Applied` status.
+
+## Sheet Status Contract
+
+The main job columns are defined in `job_finder/sheets.py`. The agent workflow
+uses these fields consistently:
+
+| Column | Meaning |
+| --- | --- |
+| `job_status` | Suitability and lifecycle status such as `Suitable`, `Not Suitable`, `Closed`, or `Applied` |
+| `suitability_reason` | Sheet-visible explanation for a suitability decision |
+| `application_result` | Application outcome; confirmed submissions use `Resume Send` |
+| `cover_letter_path` | Absolute path to the generated cover letter |
+| `applied_at` | Sheet-local timestamp written after a confirmed submission |
+| `application_notes` | Confirmation, blocker, or other application context |
+
+Rows with a nonblank `application_result` are treated as already processed by
+the application workflow. A confirmed submission sets both `job_status` to
+`Applied` and `application_result` to `Resume Send`.
+
 ## GitHub Actions
 
 The workflow in `.github/workflows/scrape-countries.yml` runs on GitHub-hosted
@@ -197,6 +235,42 @@ HTTP 429 responses; the checker defaults this to 300 seconds.
 Use `AVAILABILITY_WRITE_BATCH_SIZE` to control how many checked jobs each
 write checkpoint covers; the workflow defaults this to 100.
 
+## Agent Skills
+
+The reusable skills in `skills/` are the agent layer on top of the Python
+pipeline. `skills/` is the source of truth; `.codex/skills/` and
+`.claude/skills/` are discovery mirrors. Rebuild the mirrors after adding or
+removing a skill:
+
+```bash
+bash setup-agent-skills.sh
+```
+
+In Codex, invoke a skill with `$skill-name`. In Claude, describe the task in
+natural language or name the skill directly. The available skills are:
+
+| Skill | Use it for | Main outputs or safeguards |
+| --- | --- | --- |
+| `$triage-job-applications` | Review open Sheet rows against the resume, job descriptions, and available evidence | Writes `Suitable`/`Not Suitable` with a reason and generates missing `cover_letters/<Country>/<Company>.md` files for suitable rows |
+| `$submit-job-applications` | Apply to suitable rows that have a cover letter and no application timestamp | Fills forms and uploads materials, stops at the final submit for review, and records `Applied`/`Resume Send` only after confirmed submission |
+| `$report-job-market` | Analyze triaged rows, rejection reasons, demanded skills, and learning gaps | Rebuilds `wiki/queries/job-market-fit-report.md` with Mermaid charts; does not write back to Sheets |
+| `$wiki-read` | Answer questions from accumulated local wiki knowledge | Reads `wiki/` and returns answers with local page citations without modifying the wiki by default |
+| `$wiki-maintain` | Ingest a source or file a durable answer into the wiki | Updates source/topic/entity/query pages, `wiki/index.md`, and the append-only `wiki/log.md` |
+| `$wiki-evolve` | Audit and improve wiki structure and health | Checks links, frontmatter, provenance, orphans, and contradictions; records repairs in `wiki/meta/health.md` and the index/log |
+
+The application skills are intentionally sequential:
+
+```text
+scrape → triage → cover letter → fill application → user review → submit → record outcome
+                    └────────────── report market / maintain wiki ──────────────┘
+```
+
+Triage and application skills use local-only candidate material such as
+`resume.md`, performance-review evidence, `cover_letters/`, and wiki defaults.
+They do not invent experience or answers, do not overwrite existing application
+artifacts, and do not submit an application without the review gate unless the
+user explicitly requests submission without review.
+
 ## Local Knowledge Base
 
 This workspace also supports an agent-maintained local wiki:
@@ -211,3 +285,13 @@ Project instructions and reusable agent skills are tracked in `AGENTS.md` and
 shared contract, `CLAUDE.md` adds Claude-specific notes, and
 `setup-agent-skills.sh` mirrors the canonical `skills/` into `.codex/skills/`
 and `.claude/skills/` so each tool discovers them from its own directory.
+
+To preview the local wiki with rendered Markdown and Mermaid charts:
+
+```bash
+python serve_wiki.py
+```
+
+The server prints the local URL and automatically selects a nearby free port if
+the default port is occupied. The wiki is local-only and is not part of the
+tracked application data.
