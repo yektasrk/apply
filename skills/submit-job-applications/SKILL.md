@@ -39,7 +39,12 @@ Ensure these output columns exist before writing:
 - `application_notes`: concise status, confirmation text, or blocker details.
 - `suitability_reason`: reason a row is suitable or unsuitable, if the tab does not already have an equivalent reason column.
 
-Do not use `job_status` as an application-submitted boolean. It remains the suitability/status column from the triage workflow.
+When the site confirms a submission, update both application markers:
+
+- `job_status`: set to `Applied`.
+- `application_result`: set to `Resume Send`.
+
+Keep `applied_at` and `application_notes` in sync with those markers. Do not change these fields for forms left at review, unknown-field blockers, or failed/blocked routes.
 
 ## Review Gate
 
@@ -86,7 +91,7 @@ Prefer a company, recruiter, ATS, or employer website application form over Link
 8. Upload the resume PDF when requested. For cover-letter uploads, upload the existing cover-letter PDF directly when `cover_letter_path` points to a PDF; when it points to Markdown and the site requires a file upload, create a simple same-basename PDF derivative only for upload, preserving the Markdown source and sheet path. For cover-letter text boxes, paste the cover-letter text; extract text first if the stored file is a PDF.
 9. Answer dynamic free-text questions from the resume, performance-review evidence if already available, the row description, and the cover letter. Keep answers truthful, concise, and specific to the job.
 10. When all required fields are filled truthfully and no blocker remains, stop at the final submit control and present the application per the review gate. Submit only after the user approves, or when the user explicitly asked up front to submit without review.
-11. After the user approves and the site confirms the submission, write `applied_at` with the current sheet-local datetime and write `application_notes` with the confirmation message, submitted URL, or a short success note.
+11. After the user approves and the site confirms the submission, set `job_status` to `Applied`, set `application_result` to `Resume Send`, write `applied_at` with the current sheet-local datetime, and write `application_notes` with the confirmation message, submitted URL, or a short success note.
 12. If blocked, classify the blocker:
     - For a required field with no known truthful answer, follow the unknown-field blocker flow: fill everything else, keep the form open, and ask the user instead of abandoning the row.
     - For application-discovered disqualifiers, write the reason, set the row to `Not Suitable`, and leave `applied_at` blank.

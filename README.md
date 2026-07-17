@@ -137,7 +137,8 @@ The checker scans configured country tabs by default. If you pass a full Google
 Sheets URL with `gid=...`, it checks that tab unless you also pass `--country`,
 `--tab`, or `--gid`. When a job URL is clearly closed, it writes `Closed` to
 `job_status`, including rows currently marked `Suitable` or `Not Suitable`. It
-leaves applied/rejected terminal statuses alone unless run with `--force`.
+always skips rows marked `Applied`; other applied/rejected terminal statuses are
+protected unless run with `--force`.
 Pending status changes are flushed after every 100 checked jobs by default, then
 once more for the final partial batch. Use `--write-batch-size` to change the
 checkpoint size.

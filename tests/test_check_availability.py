@@ -168,6 +168,29 @@ class CheckWorksheetTests(unittest.TestCase):
         self.assertEqual(worksheet.batch_updates, [])
         self.assertEqual(counts["updated"], 3)
 
+    @mock.patch("job_finder.check_availability.check_job_url")
+    def test_applied_rows_are_skipped_even_with_force(self, check_url) -> None:
+        check_url.return_value = Availability("closed", "test closure")
+        worksheet = FakeWorksheet(
+            [
+                ["job_status", "title", "job_url"],
+                ["Applied", "Already submitted", "https://example.com/applied"],
+                ["Suitable", "Still eligible", "https://example.com/suitable"],
+            ]
+        )
+
+        args = _worksheet_args(dry_run=False, write_batch_size=100)
+        args.force = True
+        counts = _check_worksheet(worksheet, args)
+
+        self.assertEqual(
+            [[update["range"] for update in batch] for batch in worksheet.batch_updates],
+            [["A3"]],
+        )
+        self.assertEqual(counts["checked"], 1)
+        self.assertEqual(counts["updated"], 1)
+        self.assertEqual(counts["protected"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

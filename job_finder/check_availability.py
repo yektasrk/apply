@@ -39,6 +39,7 @@ log = logging.getLogger(__name__)
 STATUS_COLUMN = "job_status"
 URL_COLUMN = "job_url"
 CLOSED_VALUE = "Closed"
+APPLIED_VALUE = "Applied"
 DEFAULT_RATE_LIMIT_COOLDOWN = 300
 MAX_RATE_LIMIT_COOLDOWN = 1800
 DEFAULT_WRITE_BATCH_SIZE = 100
@@ -476,6 +477,11 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
             counts["blank_url"] += 1
             continue
         if _normalise_status(status) == _normalise_status(args.closed_value):
+            continue
+        # An application has already been submitted. Never overwrite that
+        # record with Closed, including when --force is used.
+        if _normalise_status(status) == _normalise_status(APPLIED_VALUE):
+            counts["protected"] += 1
             continue
         if not _can_overwrite(status, args.force):
             counts["protected"] += 1
