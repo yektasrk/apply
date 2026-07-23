@@ -27,3 +27,7 @@ CV*.pdf
 raw/
 wiki/
 cover_letters/
+
+# Local scratch: one-off scripts and generated PDF artifacts
+output/
+tmp/
