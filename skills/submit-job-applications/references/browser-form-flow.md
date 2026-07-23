@@ -31,8 +31,9 @@ Answer exactly what each field asks; do not volunteer information the field did 
 
 - Name, email, LinkedIn, education, current role, and current employer: use the wiki defaults.
 - Resume/CV upload: upload the user's local resume or CV file.
-- Cover letter text: paste the row's cover letter content as plain text. If the source is Markdown, remove Markdown headings only if they are formatting artifacts; preserve the letter text. If the source is PDF, extract the text before pasting.
-- Cover letter file upload: upload the existing PDF when `cover_letter_path` points to one. If the site requires PDF/DOC upload and the cover letter is Markdown, create a simple PDF derivative next to the Markdown file and upload that derivative.
+- Cover letter (any field): only forms with a cover-letter field trigger a letter. First obtain the letter per the Cover-Letter Handling section of SKILL.md and [cover-letter-generation.md](cover-letter-generation.md) — reuse the file when `cover_letter_path` already points to one, otherwise write and save it and record its path — then place it as below.
+- Cover letter text: paste the letter content as plain text. If the source is Markdown, remove Markdown headings only if they are formatting artifacts; preserve the letter text. If the source is PDF, extract the text before pasting.
+- Cover letter file upload: upload the PDF when `cover_letter_path` points to one. If the site requires PDF/DOC upload and the cover letter is Markdown, create a simple PDF derivative next to the Markdown file and upload that derivative.
 - Country/location fields: use only the stable default current location unless the form is asking for target job location.
 - Work authorization, sponsorship, visa, notice period, salary, phone, street address, and demographic fields: use the wiki defaults when present; otherwise fill the rest of the form, leave it open, and ask the user for the missing value per the unknown-field blocker flow in SKILL.md.
 - Optional unknown fields: leave blank when the form allows it.

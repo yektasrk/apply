@@ -1,4 +1,4 @@
 interface:
   display_name: "Triage Job Applications"
-  short_description: "Classify sheet jobs and draft cover letters"
-  default_prompt: "Use $triage-job-applications to review my job sheet, mark suitable rows, and draft missing cover letters."
+  short_description: "Classify sheet jobs as suitable or not"
+  default_prompt: "Use $triage-job-applications to review my job sheet and mark each row Suitable or Not Suitable with a reason. Cover letters are written later by the submit skill when a form asks for one."

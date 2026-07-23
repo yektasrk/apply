@@ -9,9 +9,9 @@ evidence, the maintained wiki, generated cover letters, `.env`, and Google
 service account keys are intentionally ignored.
 
 The project covers the complete flow from job discovery to application: scheduled
-scraping feeds a shared Google Sheet, agent skills triage the rows and write
-tailored cover letters, and the application skill fills forms while pausing
-before the final submission for user review.
+scraping feeds a shared Google Sheet, an agent skill triages the rows, and the
+application skill fills forms — writing a tailored cover letter on demand when a
+form asks for one — while pausing before the final submission for user review.
 
 ## Repository Contents
 
@@ -251,8 +251,8 @@ natural language or name the skill directly. The available skills are:
 
 | Skill | Use it for | Main outputs or safeguards |
 | --- | --- | --- |
-| `$triage-job-applications` | Review open Sheet rows against the resume, job descriptions, and available evidence | Writes `Suitable`/`Not Suitable` with a reason and generates missing `cover_letters/<Country>/<Company>.md` files for suitable rows |
-| `$submit-job-applications` | Apply to suitable rows that have a cover letter and no application timestamp | Fills forms and uploads materials, stops at the final submit for review, and records `Applied`/`Resume Send` only after confirmed submission |
+| `$triage-job-applications` | Review open Sheet rows against the resume, job descriptions, and available evidence | Writes `Suitable`/`Not Suitable` with a reason |
+| `$submit-job-applications` | Apply to suitable rows with no application timestamp | Fills forms and uploads materials, generates a tailored `cover_letters/<Country>/<Company>.md` on demand when a form asks for one and records its path, stops at the final submit for review, and records `Applied`/`Resume Send` only after confirmed submission |
 | `$report-job-market` | Analyze triaged rows, rejection reasons, demanded skills, and learning gaps | Rebuilds `wiki/queries/job-market-fit-report.md` with Mermaid charts; does not write back to Sheets |
 | `$wiki-read` | Answer questions from accumulated local wiki knowledge | Reads `wiki/` and returns answers with local page citations without modifying the wiki by default |
 | `$wiki-maintain` | Ingest a source or file a durable answer into the wiki | Updates source/topic/entity/query pages, `wiki/index.md`, and the append-only `wiki/log.md` |
@@ -261,8 +261,8 @@ natural language or name the skill directly. The available skills are:
 The application skills are intentionally sequential:
 
 ```text
-scrape → triage → cover letter → fill application → user review → submit → record outcome
-                    └────────────── report market / maintain wiki ──────────────┘
+scrape → triage → fill application (+ cover letter when the form asks) → user review → submit → record outcome
+              └──────────────────── report market / maintain wiki ────────────────────┘
 ```
 
 Triage and application skills use local-only candidate material such as
