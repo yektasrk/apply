@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reconcile Job Application Emails"
+  short_description: "Match job emails to the tracker and file them"
+  default_prompt: "Use $gmail-job-application-reconcile to reconcile recent job-application emails with my Jobs! sheet and move them to Apply!."
