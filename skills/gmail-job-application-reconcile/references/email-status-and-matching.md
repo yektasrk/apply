@@ -41,6 +41,7 @@ Use for explicit acknowledgements such as:
 - “we received your application”
 - “thank you for applying” when the message clearly refers to a submitted application
 - “your application was submitted successfully”
+- “your application is under review” when the message clearly identifies the received/submitted application and matches the exact role and company
 
 Candidate-account activation, verification, or profile-setup messages are relevant to filing but are not sufficient by themselves for a `Resume Send` cell update.
 

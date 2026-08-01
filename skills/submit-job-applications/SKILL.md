@@ -89,6 +89,8 @@ Add `--check` for a dry run that prints planned writes without touching the shee
 
 The updater re-reads the sheet at apply time and enforces the safety guards for you: it skips rows whose current `job_status` is terminal, never overwrites a nonblank `cover_letter_path`, errors if a named column is missing (create `applied_at` / `application_notes` first), and verifies every write by reading it back. It also skips any row that already has a nonblank `application_result` — the normal success write passes because the row is still blank at that point, but for a user-approved retry of a row that already carries a result, add `"allow_nonblank_application_result": true` to the JSON. Report its summary of written cells and skipped rows/fields back to the user.
 
+After a successful updater run and read-back verification, delete the temporary JSON payload used for that run. Delete only update payloads created for the current workflow; preserve `service_account.json`, report artifacts, generated letters/PDFs, the updater script, and any JSON whose purpose is not a sheet update. If the updater fails or a retry is still needed, retain the payload until the write is resolved.
+
 ## Review Gate
 
 Filling is autonomous; submitting is not. Complete every step of the form, but stop before the control that finalizes the application and hand it over for review. The final submit is irreversible and represents the user to an employer, so they see it before it goes out.
@@ -163,6 +165,18 @@ These are recurring implementation rules learned from live applications:
 - Do not create an account or enter credentials to overcome a login gate. Leave Amazon.jobs, Workday, or other sign-in tabs open, record the exact sign-in/account blocker, and continue the batch where possible.
 - Do not check arbitration, personal-completion, accuracy, or other legal attestations that require the applicant to have personally read or completed them. Leave them for the user unless the text is a standard, truthful privacy/consent acknowledgement already covered by the workflow.
 - Optional demographic fields should remain blank or use a neutral `Prefer not to answer` option when available. Do not guess demographic data.
+
+## Session-Sourced Workflow Lessons
+
+These rules were added after the 2026-08-02 application session; candidate-specific values belong in `wiki/topics/job-application-form-defaults.md` rather than in this skill:
+
+- When the user requests Chrome, use the external Chrome session for all application tabs and preserve tabs that need review, CAPTCHA completion, or handoff. Do not switch those tabs to the in-app Browser.
+- If the user says `submitted`, verify a confirmation page or a matched employer email before updating the sheet. A matched acknowledgement that the application was received or is under review counts as `Resume Send`; it is not a rejection.
+- Do not solve or bypass CAPTCHA. If the widget is missing or cannot be completed, leave the tab open, record the blocker in `application_notes`, and keep the row retryable.
+- When an ATS asks for document categories, assign the resume to `Lebenslauf` / Resume and the cover letter to `Anschreiben` / Cover letter, then verify both filenames/statuses.
+- For readonly or calendar-driven date fields, use the visible picker and verify the final rendered date after committing the month/year and day.
+- If `Transcripts and certificates` is required and no separate document is available, leave that blocker for the user; never upload the resume as a substitute.
+- Fill optional motivation or why-join fields with concise, truthful, job-specific English when the user has instructed the workflow to complete them.
 
 ## Application-Discovered Unsuitability
 

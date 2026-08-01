@@ -20,6 +20,7 @@ Read recent application mail, match it to the user's jobs tracker, update only d
    - `Resume Reject`: explicit rejection or non-progression language.
    - `Online Meeting`: an actual invitation or scheduling request for a call/interview. Do not use this for messages that merely mention an interview process, a possible future next stage, or an interview guide.
    - `Resume Send`: explicit receipt, submission, or application confirmation.
+   - Treat `under review` as `Resume Send` when the matched message clearly confirms that the application was received/submitted for the exact role and company. Do not classify generic career updates or role-closure notices this way.
    - Keep application-workflow messages such as candidate-account activation available for Gmail filing, but do not write `Resume Send` unless the message confirms an application was submitted.
    - Exclude LinkedIn invitations, profile-view notices, saved-job alerts, job newsletters, career-marketing mail, and unrelated personal or promotional messages.
    - Use the detailed phrase guidance in [email-status-and-matching.md](references/email-status-and-matching.md).
