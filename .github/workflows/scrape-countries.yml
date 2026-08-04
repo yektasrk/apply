@@ -96,6 +96,10 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_FILE: service_account.json
           GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          # Dedup reads the archive sheet as well as the live one. Without this
+          # the scrape would re-import every archived job, so job_finder.archive
+          # raises rather than letting the run look successful.
+          GOOGLE_ARCHIVE_SHEET_ID: ${{ secrets.GOOGLE_ARCHIVE_SHEET_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
         run: python -m job_finder.main --country "${{ needs.resolve-country.outputs.country }}"

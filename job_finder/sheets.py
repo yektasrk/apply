@@ -77,22 +77,49 @@ def ensure_header(ws: gspread.Worksheet) -> list[str]:
 
 @retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
 def get_existing_urls(ws: gspread.Worksheet) -> set[str]:
-    all_values = ws.get_all_values()
-    if len(all_values) < 2:
-        return set()
-    headers = [str(value).strip() for value in all_values[0]]
+    """URLs already present in this live tab.
+
+    Only the `job_url` column is fetched. Rows carry full job descriptions, so
+    reading whole rows would pull megabytes across the wire just to collect links.
+    """
+    headers = [str(value).strip() for value in ws.row_values(1)]
     try:
         url_col_index = headers.index(DEDUP_COLUMN)
     except ValueError:
         log.warning("Sheet is missing required '%s' column.", DEDUP_COLUMN)
         return set()
-    existing = {
-        row[url_col_index].strip()
-        for row in all_values[1:]
-        if len(row) > url_col_index and row[url_col_index].strip()
-    }
+    column = ws.col_values(url_col_index + 1)[1:]
+    existing = {value.strip() for value in column if value.strip()}
     log.info("Found %d existing job URL(s) in sheet.", len(existing))
     return existing
+
+
+def get_known_urls(ws: gspread.Worksheet) -> set[str]:
+    """Every URL that must not be re-imported: this live tab plus its archive tab.
+
+    Not-suitable rows are deleted from the live sheet once archived, so without
+    the archive half of this union the next scrape would re-import every job
+    that was just archived. `archive.get_archive_spreadsheet()` raises when the
+    archive id is unset; that failure is deliberate and must not be swallowed
+    here — a silent skip would look like a normal run while quietly undoing the
+    archive.
+    """
+    # Imported lazily: job_finder.archive reads SHEET_COLUMNS from this module,
+    # so a module-level import would be circular.
+    from . import archive
+
+    window_days = archive.dedup_window_days()
+    live = get_existing_urls(ws)
+    archived = archive.get_archived_urls(window_days=window_days, tab_title=ws.title)
+    known = live | archived
+    log.info(
+        "Dedup set: %d live + %d archived (last %d days) = %d unique URL(s).",
+        len(live),
+        len(archived),
+        window_days,
+        len(known),
+    )
+    return known
 
 
 def _build_rows(df: pd.DataFrame, headers: list[str]) -> list[list]:
@@ -186,7 +213,7 @@ def push_jobs(jobs: pd.DataFrame) -> tuple[int, int, pd.DataFrame]:
     ws = get_worksheet()
     headers = ensure_header(ws)
 
-    existing_urls = get_existing_urls(ws)
+    existing_urls = get_known_urls(ws)
     df = _prepare_df(jobs)
 
     before = len(df)
@@ -212,8 +239,8 @@ def push_single(job: pd.Series) -> bool:
     headers = ensure_header(ws)
 
     job_url = str(job.get("job_url") or "")
-    if job_url in get_existing_urls(ws):
-        log.warning("Job already in sheet — skipping.")
+    if job_url in get_known_urls(ws):
+        log.warning("Job already in sheet or archive — skipping.")
         return False
 
     df = _prepare_df(pd.DataFrame([job]))

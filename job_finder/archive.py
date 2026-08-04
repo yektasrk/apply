@@ -140,19 +140,30 @@ def _read_url_and_timestamp_columns(ws: gspread.Worksheet) -> list[tuple[str, st
     return pairs
 
 
-def get_archived_urls(window_days: int | None = None) -> set[str]:
-    """Archived `job_url`s, optionally limited to the recent dedup window.
+def get_archived_urls(
+    window_days: int | None = None,
+    tab_title: str | None = None,
+) -> set[str]:
+    """Archived `job_url`s, optionally limited to one tab and a recent window.
 
     `window_days=None` reads every archived row and is what the archiver uses to
     stay idempotent. Dedup passes a window so the read stays small.
+
+    `tab_title` limits the read to one country. Live dedup is per-tab, so
+    scraping one country never needs the other eight tabs. A country with
+    nothing archived yet simply has no tab, which reads as an empty set.
     """
     spreadsheet = get_archive_spreadsheet()
     cutoff = None
     if window_days is not None:
         cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=window_days)
 
+    worksheets = spreadsheet.worksheets()
+    if tab_title is not None:
+        worksheets = [ws for ws in worksheets if ws.title == tab_title]
+
     urls: set[str] = set()
-    for ws in spreadsheet.worksheets():
+    for ws in worksheets:
         for url, stamp in _read_url_and_timestamp_columns(ws):
             if not url:
                 continue
