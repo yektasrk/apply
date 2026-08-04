@@ -130,7 +130,7 @@ class CheckWorksheetTests(unittest.TestCase):
         worksheet = FakeWorksheet(
             [["job_status", "title", "job_url"]]
             + [
-                ["Not Suitable", f"Job {number}", f"https://example.com/{number}"]
+                ["Suitable", f"Job {number}", f"https://example.com/{number}"]
                 for number in range(1, 6)
             ]
         )
@@ -190,6 +190,53 @@ class CheckWorksheetTests(unittest.TestCase):
         self.assertEqual(counts["checked"], 1)
         self.assertEqual(counts["updated"], 1)
         self.assertEqual(counts["protected"], 1)
+
+    @mock.patch("job_finder.check_availability.check_job_url")
+    def test_only_suitable_rows_are_checked(self, check_url) -> None:
+        check_url.return_value = Availability("closed", "test closure")
+        worksheet = FakeWorksheet(
+            [
+                ["job_status", "title", "job_url"],
+                ["", "Untriaged", "https://example.com/untriaged"],
+                ["Not Suitable", "Rejected", "https://example.com/rejected"],
+                ["Suitable", "Worth applying", "https://example.com/suitable"],
+            ]
+        )
+
+        counts = _check_worksheet(
+            worksheet,
+            _worksheet_args(dry_run=False, write_batch_size=100),
+        )
+
+        self.assertEqual(counts["checked"], 1)
+        self.assertEqual(counts["protected"], 2)
+        self.assertEqual(
+            [[update["range"] for update in batch] for batch in worksheet.batch_updates],
+            [["A4"]],
+        )
+
+    @mock.patch("job_finder.check_availability.check_job_url")
+    def test_rows_with_an_application_result_are_skipped(self, check_url) -> None:
+        check_url.return_value = Availability("closed", "test closure")
+        worksheet = FakeWorksheet(
+            [
+                ["job_status", "application_result", "title", "job_url"],
+                ["Suitable", "Resume Reject", "Outcome recorded", "https://example.com/1"],
+                ["Suitable", "", "Still open", "https://example.com/2"],
+            ]
+        )
+
+        counts = _check_worksheet(
+            worksheet,
+            _worksheet_args(dry_run=False, write_batch_size=100),
+        )
+
+        self.assertEqual(counts["checked"], 1)
+        self.assertEqual(counts["protected"], 1)
+        self.assertEqual(
+            [[update["range"] for update in batch] for batch in worksheet.batch_updates],
+            [["A3"]],
+        )
 
 
 if __name__ == "__main__":

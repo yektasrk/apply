@@ -1,6 +1,11 @@
 """
 check_availability.py - Mark closed job rows in Google Sheets.
 
+Only rows whose job_status is Suitable are checked. Those are the jobs we intend
+to apply to, so their availability is the only availability that changes a
+decision. Untriaged rows are left alone until they are triaged, and not-suitable
+rows are on their way to the archive sheet.
+
 Usage:
   python -m job_finder.check_availability
   python -m job_finder.check_availability --country denmark
@@ -38,20 +43,18 @@ log = logging.getLogger(__name__)
 
 STATUS_COLUMN = "job_status"
 URL_COLUMN = "job_url"
+RESULT_COLUMN = "application_result"
 CLOSED_VALUE = "Closed"
 APPLIED_VALUE = "Applied"
 DEFAULT_RATE_LIMIT_COOLDOWN = 300
 MAX_RATE_LIMIT_COOLDOWN = 1800
 DEFAULT_WRITE_BATCH_SIZE = 100
 
-OVERWRITABLE_STATUSES = {
-    "",
-    "false",
-    "no",
-    "yes",
-    "suitable",
-    "not suitable",
-}
+# Only jobs we actually intend to apply to are worth an availability check.
+# Untriaged rows are left alone until they are triaged, and not-suitable rows
+# are on their way to the archive sheet, so closing either one buys nothing and
+# costs an HTTP request per row.
+CHECKABLE_STATUSES = {"suitable"}
 
 CLOSED_PHRASES = (
     "no longer accepting applications",
@@ -400,10 +403,10 @@ def _header_indexes(headers: Iterable[str]) -> dict[str, int]:
     }
 
 
-def _can_overwrite(status: str, force: bool) -> bool:
+def _is_checkable(status: str, force: bool) -> bool:
     if force:
         return True
-    return _normalise_status(status) in OVERWRITABLE_STATUSES
+    return _normalise_status(status) in CHECKABLE_STATUSES
 
 
 def _flush_updates(
@@ -457,6 +460,7 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
 
     status_col = headers[STATUS_COLUMN]
     url_col = headers[URL_COLUMN]
+    result_col = headers.get(RESULT_COLUMN)
     updates = []
     rate_limit_cooldowns: dict[str, float] = {}
     counts = {
@@ -483,7 +487,13 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
         if _normalise_status(status) == _normalise_status(APPLIED_VALUE):
             counts["protected"] += 1
             continue
-        if not _can_overwrite(status, args.force):
+        # An application outcome has been recorded (e.g. by the Gmail reconcile
+        # skill) even though job_status still reads Suitable. Writing Closed
+        # would bury a real outcome under an availability result.
+        if result_col is not None and len(row) > result_col and row[result_col].strip():
+            counts["protected"] += 1
+            continue
+        if not _is_checkable(status, args.force):
             counts["protected"] += 1
             continue
 
@@ -585,7 +595,10 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite terminal statuses too",
+        help=(
+            "Check every row regardless of job_status, not just Suitable ones. "
+            "Applied rows and rows with an application_result stay protected."
+        ),
     )
     parser.add_argument(
         "--closed-value",
