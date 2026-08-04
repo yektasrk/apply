@@ -216,13 +216,14 @@ class CheckWorksheetTests(unittest.TestCase):
         )
 
     @mock.patch("job_finder.check_availability.check_job_url")
-    def test_rows_with_an_application_result_are_skipped(self, check_url) -> None:
+    def test_rows_with_application_evidence_are_skipped(self, check_url) -> None:
         check_url.return_value = Availability("closed", "test closure")
         worksheet = FakeWorksheet(
             [
-                ["job_status", "application_result", "title", "job_url"],
-                ["Suitable", "Resume Reject", "Outcome recorded", "https://example.com/1"],
-                ["Suitable", "", "Still open", "https://example.com/2"],
+                ["job_status", "application_result", "applied_at", "title", "job_url"],
+                ["Suitable", "Resume Reject", "", "Outcome recorded", "https://example.com/1"],
+                ["Suitable", "", "2026-07-24 15:30 Asia/Tehran", "Submitted", "https://example.com/2"],
+                ["Suitable", "", "", "Still open", "https://example.com/3"],
             ]
         )
 
@@ -232,11 +233,30 @@ class CheckWorksheetTests(unittest.TestCase):
         )
 
         self.assertEqual(counts["checked"], 1)
-        self.assertEqual(counts["protected"], 1)
+        self.assertEqual(counts["protected"], 2)
         self.assertEqual(
             [[update["range"] for update in batch] for batch in worksheet.batch_updates],
-            [["A3"]],
+            [["A4"]],
         )
+
+    @mock.patch("job_finder.check_availability.check_job_url")
+    def test_application_evidence_survives_force(self, check_url) -> None:
+        check_url.return_value = Availability("closed", "test closure")
+        worksheet = FakeWorksheet(
+            [
+                ["job_status", "application_result", "applied_at", "title", "job_url"],
+                ["Suitable", "Resume Send", "", "Outcome recorded", "https://example.com/1"],
+                ["", "", "2026-07-24 15:30 Asia/Tehran", "Submitted", "https://example.com/2"],
+            ]
+        )
+
+        args = _worksheet_args(dry_run=False, write_batch_size=100)
+        args.force = True
+        counts = _check_worksheet(worksheet, args)
+
+        self.assertEqual(counts["checked"], 0)
+        self.assertEqual(counts["protected"], 2)
+        self.assertEqual(worksheet.batch_updates, [])
 
 
 if __name__ == "__main__":

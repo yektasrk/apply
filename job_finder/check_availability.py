@@ -43,9 +43,13 @@ log = logging.getLogger(__name__)
 
 STATUS_COLUMN = "job_status"
 URL_COLUMN = "job_url"
-RESULT_COLUMN = "application_result"
 CLOSED_VALUE = "Closed"
 APPLIED_VALUE = "Applied"
+# Any one of these being nonblank means an application exists for the row, even
+# when job_status has not caught up: the submit skill writes the timestamp and
+# the result together, and the Gmail reconcile skill can record an outcome on
+# its own. Writing Closed over such a row would bury a real application.
+APPLICATION_EVIDENCE_COLUMNS = ("application_result", "applied_at")
 DEFAULT_RATE_LIMIT_COOLDOWN = 300
 MAX_RATE_LIMIT_COOLDOWN = 1800
 DEFAULT_WRITE_BATCH_SIZE = 100
@@ -460,7 +464,11 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
 
     status_col = headers[STATUS_COLUMN]
     url_col = headers[URL_COLUMN]
-    result_col = headers.get(RESULT_COLUMN)
+    evidence_cols = [
+        headers[column]
+        for column in APPLICATION_EVIDENCE_COLUMNS
+        if column in headers
+    ]
     updates = []
     rate_limit_cooldowns: dict[str, float] = {}
     counts = {
@@ -487,10 +495,9 @@ def _check_worksheet(ws: gspread.Worksheet, args: argparse.Namespace) -> dict[st
         if _normalise_status(status) == _normalise_status(APPLIED_VALUE):
             counts["protected"] += 1
             continue
-        # An application outcome has been recorded (e.g. by the Gmail reconcile
-        # skill) even though job_status still reads Suitable. Writing Closed
-        # would bury a real outcome under an availability result.
-        if result_col is not None and len(row) > result_col and row[result_col].strip():
+        # An application exists even though job_status has not caught up.
+        # Protected the same way as an Applied status, including under --force.
+        if any(len(row) > index and row[index].strip() for index in evidence_cols):
             counts["protected"] += 1
             continue
         if not _is_checkable(status, args.force):
