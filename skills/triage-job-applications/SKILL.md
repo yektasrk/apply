@@ -34,6 +34,8 @@ Use the existing sheet semantics unless the user specifies a different sheet. Re
 
 The `cover_letter_path` column is owned by the submit skill; triage neither reads nor writes it.
 
+`Not Suitable` rows are moved to a separate archive spreadsheet and deleted from the live sheet, so a row you reject will not stay where you wrote it. Two consequences for triage: the `suitability_reason` you write is the permanent record of that decision — the row's other columns survive too, but the reason is the only part anyone reads again — and a job missing from a tab may have been rejected earlier rather than never seen, so check the archive before concluding a job is new. Dedup already accounts for this: the scraper will not re-import an archived job.
+
 ## Workflow
 
 1. Locate the spreadsheet and tabs from the workspace configuration or the user's request. Prefer a connected Google Sheets/Drive tool when available; otherwise use the local service-account credentials (`service_account.json` at the repo root, read through the helpers in `job_finder/sheets.py`) without copying secrets into outputs.

@@ -20,7 +20,8 @@ apply/
 ├── job_finder/                 # Python package for scraping and sheet writes
 │   ├── main.py                 # Scheduled scrape entry point
 │   ├── add_job.py              # Add one LinkedIn job URL manually
-│   ├── check_availability.py   # Mark closed existing jobs in Google Sheets
+│   ├── archive.py              # Archive spreadsheet: append rows, read known URLs
+│   ├── check_availability.py   # Mark closed Suitable jobs in Google Sheets
 │   ├── config.py               # Countries and env-backed runtime settings
 │   ├── scraper.py              # LinkedIn scraping through JobSpy
 │   ├── sheets.py               # Google Sheets dedupe and append logic
@@ -69,11 +70,16 @@ set +a
 2. Enable the Google Sheets API and Google Drive API.
 3. Create a service account and download its JSON key.
 4. Save the key locally as `service_account.json`.
-5. Share the target Google Sheet with the service account email as an editor.
-6. Set `GOOGLE_SHEET_ID` in `.env` from the sheet URL.
-7. Set `GOOGLE_SHEET_NAME` if you want to keep the sheet name documented in env.
+5. Create a second, empty spreadsheet to serve as the archive.
+6. Share **both** sheets with the service account email as an editor. A
+   share-link is not enough; a service account has no browser session and must
+   be added by address.
+7. Set `GOOGLE_SHEET_ID` and `GOOGLE_ARCHIVE_SHEET_ID` in `.env` from the sheet
+   URLs. Both are required — see [Two Spreadsheets](#two-spreadsheets).
+8. Set `GOOGLE_SHEET_NAME` if you want to keep the sheet name documented in env.
 
 The app writes to country-specific tabs defined in `job_finder/config.py`.
+Archive tabs of the same names are created on demand.
 
 ## Telegram
 
@@ -93,6 +99,7 @@ Runtime settings are environment-backed:
 GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json
 GOOGLE_SHEET_NAME=
 GOOGLE_SHEET_ID=
+GOOGLE_ARCHIVE_SHEET_ID=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHANNEL_ID=
 SEARCH_TERMS='"Site Reliability Engineer","Platform Engineer","DevOps Engineer","Infrastructure Engineer"'
@@ -141,10 +148,21 @@ python -m job_finder.check_availability --gid 711463063
 
 The checker scans configured country tabs by default. If you pass a full Google
 Sheets URL with `gid=...`, it checks that tab unless you also pass `--country`,
-`--tab`, or `--gid`. When a job URL is clearly closed, it writes `Closed` to
-`job_status`, including rows currently marked `Suitable` or `Not Suitable`. It
-always skips rows marked `Applied`; other applied/rejected terminal statuses are
-protected unless run with `--force`.
+`--tab`, or `--gid`.
+
+**Only rows marked `Suitable` are checked.** Those are the jobs you intend to
+apply to, so theirs is the only availability that changes a decision. Untriaged
+rows are left alone until they are triaged, and not-suitable rows belong in the
+archive sheet. This is also what keeps the checker from erasing triage verdicts:
+`job_status` has no separate availability field, so writing `Closed` overwrites
+whatever was there, and `Suitable` is the only verdict worth replacing that way.
+
+A row is skipped when its `job_status` is `Applied`, or when `application_result`
+or `applied_at` is nonblank — an application exists even if `job_status` has not
+caught up, and burying it under an availability result would lose a real outcome.
+Those protections hold under `--force`, which otherwise widens the scan to every
+row regardless of status.
+
 Pending status changes are flushed after every 100 checked jobs by default, then
 once more for the final partial batch. Use `--write-batch-size` to change the
 checkpoint size.
@@ -161,10 +179,42 @@ python -m pytest tests -q
 ```
 
 The availability checker only marks a row `Closed` when it finds a recognized
-closed-posting signal. It skips rows already marked `Applied`, protects other
-terminal statuses by default, supports dry runs, and flushes changes to Sheets
-in configurable batches. Use `--force` only when intentionally overriding a
-protected non-`Applied` status.
+closed-posting signal. It supports dry runs and flushes changes to Sheets in
+configurable batches. Use `--force` only when you intentionally want to scan
+statuses outside `Suitable`; it cannot override the application-evidence guards.
+
+## Two Spreadsheets
+
+Job rows live in two Google Sheets, each with the same country tabs:
+
+| Sheet | Env var | Holds |
+| --- | --- | --- |
+| Live | `GOOGLE_SHEET_ID` | untriaged rows, `Suitable` rows, and applications in flight |
+| Archive | `GOOGLE_ARCHIVE_SHEET_ID` | `Not Suitable` rows, with every column including `description` |
+
+The live sheet is the working set, kept small enough to actually work in. The
+archive keeps the full history of rejections so no triage reasoning is lost.
+Archived rows are removed from the live sheet, which makes two things mandatory:
+
+- **Dedup reads both.** `sheets.get_known_urls()` unions the live tab with its
+  archive counterpart. Without the archive half, the next scrape would treat
+  every archived job as new and re-import all of them. `job_finder.archive`
+  raises when `GOOGLE_ARCHIVE_SHEET_ID` is unset rather than silently scraping
+  against the live sheet alone.
+- **The report reads both.** `skills/report-job-market/scripts/pull.py` reads
+  both spreadsheets and exits with an error if the archive id is missing. A
+  live-only report would drop every archived rejection reason and make the
+  market look far more receptive than it is.
+
+The dedup lookback is derived from `HOURS_OLD` rather than hardcoded: a scrape
+only returns postings newer than that, so anything archived longer ago cannot
+reappear. At the default 36h the window is 7 days, and it cannot drift when
+`HOURS_OLD` changes.
+
+`job_finder/archive.py` provides the plumbing — creating country tabs, appending
+rows with read-back verification, and collecting archived URLs. **The command
+that actually moves rows is not built yet**, so nothing is archived today and
+the archive sheet is empty.
 
 ## Sheet Status Contract
 
