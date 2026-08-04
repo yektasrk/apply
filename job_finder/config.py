@@ -125,6 +125,11 @@ GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv(
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "")
 
+# Spreadsheet that not-suitable rows are moved to before being deleted from the
+# live sheet. Dedup reads it, so an unset value would silently re-import every
+# archived job on the next scrape — job_finder.archive raises instead.
+GOOGLE_ARCHIVE_SHEET_ID = os.getenv("GOOGLE_ARCHIVE_SHEET_ID", "")
+
 # ── Telegram ────────────────────────────────────────────────────────────────────
 # 1. Message @BotFather on Telegram → /newbot → copy the token
 # 2. Add the bot to your channel as an Administrator
