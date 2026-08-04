@@ -34,10 +34,19 @@ the thing that decides a category.
 
 ## Data Source
 
-Read-only. Use a connected Google Sheets tool when available; otherwise the local
-service account via `job_finder.sheets.get_spreadsheet()` (credentials in
-`service_account.json`, sheet id in `config_local.py` / `GOOGLE_SHEET_ID`). Never
-copy secrets into the report.
+Read-only, and there are **two** spreadsheets:
+
+- the live sheet (`GOOGLE_SHEET_ID`) — untriaged, suitable, and applied rows
+- the archive sheet (`GOOGLE_ARCHIVE_SHEET_ID`) — not-suitable rows, which are
+  deleted from the live sheet once archived
+
+Both must be read. A live-only report would silently lose every archived
+rejection reason and overstate how suitable the market looks. `scripts/pull.py`
+reads both and exits with an error if the archive id is missing rather than
+quietly reporting a partial picture.
+
+Credentials come from `service_account.json`; sheet ids from `config_local.py`
+then env. Never copy secrets into the report.
 
 Fields used: `job_status`, `suitability_reason`, `title`, `company`, `location`,
 `job_level`, `is_remote`, `date_posted`, per-tab country. The full `description`
@@ -56,10 +65,20 @@ scope for v1 (needs currency normalization); leave a placeholder if the user ask
 ## Workflow
 
 1. **Pull (mechanical).** Run `scripts/pull.py` from the repo root with the venv
-   python. It reads every tab, keeps triaged rows, and writes to a scratchpad dir:
-   `summary.json` (status counts per tab), `ns_batch*.json` and `su_batch.json`
-   (distinct rejection / suitability reason strings with occurrence counts). It
-   deduplicates because a few hundred distinct strings back thousands of rows.
+   python. It reads every tab of both spreadsheets, keeps triaged rows, and
+   writes to a scratchpad dir: `summary.json` (status counts per country, live
+   and archive merged, which is the shape `render.py` consumes), `coverage.json`
+   (the same counts split by source, plus duplicates dropped), and
+   `ns_batch*.json` / `su_batch.json` (distinct rejection / suitability reason
+   strings with occurrence counts). It deduplicates because a few hundred
+   distinct strings back thousands of rows.
+
+   Rows are also deduplicated by `job_url`, so the same job counted twice does
+   not inflate the charts. `coverage.json` records how many were dropped and
+   why: `within_source` means one spreadsheet holds the same job on two rows,
+   `across_sources` means the archiver appended a row but has not yet deleted
+   the live one. Chart totals equal the triaged totals in `summary.json` **minus**
+   those drops — reconcile against that, do not expect a bare match.
 2. **Classify (LLM-authored, fan out to subagents).** For each `ns_batch*.json`,
    a subagent assigns every distinct reason exactly one primary category from
    [reason-taxonomy.md](references/reason-taxonomy.md) and extracts canonical
@@ -73,7 +92,9 @@ scope for v1 (needs currency normalization); leave a placeholder if the user ask
    category totals, structural-vs-fixable split, top demanded skills, top skill
    gaps, matched strengths, near-miss jobs, and per-country ratios, then emits a
    Markdown block of Mermaid charts + tables to `report_body.md` in scratchpad.
-4. **Write the page (agent-authored prose).** Create/overwrite
+4. **Write the page (agent-authored prose).** Read `coverage.json` before writing
+   the Coverage section: state rows read from each sheet and any duplicates
+   dropped, so no number reads as more complete than it is. Create/overwrite
    `wiki/queries/job-market-fit-report.md` with AGENTS.md frontmatter
    (`type: query`), a `## Summary` you write from the aggregates, the rendered
    charts, and a `## Learning Backlog` narrative that turns the top gaps into
@@ -85,7 +106,8 @@ scope for v1 (needs currency normalization); leave a placeholder if the user ask
    `wiki/log.md` entry `## [YYYY-MM-DD] query | Job-Market Fit Report`.
 6. **Validate (mechanical).** Confirm the page has valid frontmatter, every Mermaid
    block opens and closes, chart numbers sum to the reasoned-row totals from
-   `summary.json`, and the index/log were updated. Fix mismatches before reporting.
+   `summary.json` less `coverage.json`'s `duplicates_dropped`, and the index/log
+   were updated. Fix mismatches before reporting.
 7. **Report counts** to the user: rows aggregated, top 3 not-suitable categories,
    top 3 skill gaps, most receptive country.
 
