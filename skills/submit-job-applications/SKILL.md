@@ -1,13 +1,13 @@
 ---
 name: submit-job-applications
-description: Fill job application forms from the local job finder Google Sheet for rows marked suitable with no applied_at timestamp, generating a tailored cover letter on demand when the form asks for one, pausing for user review before the final submit. Use when the user asks to apply to jobs, submit applications, fill job application forms in the browser, upload the resume, generate a cover letter for an application, or continue the sheet-to-application workflow.
+description: Run a rolling pool of up to six one-job workers that fill suitable job applications from the local job finder Google Sheet in the user's visible external Chrome window, generate tailored cover letters on demand, pause each application for user review before final submit, verify confirmed submissions, and record outcomes before reusing a worker slot. Use when the user asks to apply to jobs, submit applications, fill job application forms in the browser, upload the resume, generate a cover letter for an application, or continue the sheet-to-application workflow.
 ---
 
 # Submit Job Applications
 
 ## Overview
 
-Use this skill to turn suitable sheet rows into applications that are completely filled and ready to send. The workflow is action-oriented up to the last click: fill visible fields, advance through multi-step forms, and resolve every answerable question — but the final submit is gated on the user's review. When an application form asks for a cover letter, generate a tailored one at that point, save it locally, record its path in the sheet, and place it in the form. Record a submission in the sheet with a timestamp only after the user approves and the site confirms it.
+Use this skill to turn suitable sheet rows into applications that are completely filled and ready to send. Run one default rolling worker pool with at most six active jobs: each worker owns one visible external-Chrome tab and group until that job reaches a verified, recorded outcome. Fill visible fields, advance through multi-step forms, and resolve every answerable question, but gate the final submit on the user's review. When a form asks for a cover letter, generate it at that point, save it locally, record its path in the sheet, and place it in the form. Record a submission only after the user approves and the site confirms it, then verify the sheet write before releasing that worker to the next job.
 
 ## Required Context
 
@@ -20,13 +20,13 @@ Before applying, read (paths relative to the repo root):
 - [cover-letter-generation.md](references/cover-letter-generation.md) for when and how to write a cover letter for a form that asks for one.
 - [performance-review-evidence.md](references/performance-review-evidence.md), plus any performance-review markdown already in the workspace, used as cover-letter evidence only.
 - [browser-form-flow.md](references/browser-form-flow.md) before operating a web form.
-- [Codex browser and batch notes](codex/browser-and-batch.md) when running this skill in Codex; other agents should use their native browser and session-retention mechanisms.
+- [Codex browser and worker-pool notes](codex/browser-and-worker-pool.md) when running this skill in Codex; other agents should use their native browser and session-retention mechanisms while preserving the same pool invariants.
 
 Use the user's local resume or CV file whenever a form asks for a resume or CV upload.
 
 ## Candidate Rows
 
-Refresh sheet metadata and headers before selecting rows. Process a small batch, defaulting to 5 rows per run, unless the user explicitly gives a larger scope.
+Refresh sheet metadata and headers before selecting rows. Seed up to six active rows by default, or fewer when the user requests a smaller concurrency or fewer eligible rows exist. Six is the current concurrency and live-tab ceiling; never exceed it.
 
 Select only rows where:
 
@@ -44,18 +44,21 @@ Ensure these output columns exist before writing:
 - `cover_letter_path`: absolute path to the cover letter, written when one is generated or reused for a form that asks for it.
 - `suitability_reason`: reason a row is suitable or unsuitable, if the tab does not already have an equivalent reason column.
 
-## Batch Mode
+## Default Rolling Worker Pool
 
-When the user explicitly asks for a batch, use a maximum of five rows unless they specify a different size. A batch is a preparation unit, not permission to submit multiple applications:
+Use this as the only operating mode; the user does not need to request batching or parallelism. Maintain a rolling pool of at most six active worker slots and continue through the requested queue as slots become safely reusable.
 
-- Refresh the sheet, select the next eligible rows, and keep a stable mapping of `row number -> company -> role -> tab`.
-- Open one application tab per row. Fill and inspect tabs in parallel where practical, but take each form through its own visible state; do not copy assumptions between sites.
-- Continue filling the other tabs when one row is blocked. Leave the blocked tab open, record the blocker in `application_notes`, and keep `applied_at` blank.
-- Do not open the next batch until the user confirms the current batch is finished or submitted. A user message such as `submitted` is a request to verify the relevant confirmation page before updating the sheet.
-- Never click a final Submit control for any tab unless the user explicitly approves submission in the current request. Intermediate Apply/Next/Continue/Save-and-continue controls are allowed only when they clearly advance the form.
-- If the user says to keep application sessions open, preserve every batch session at the end of the turn using the host's handoff/retention mechanism; do not close, omit, or recycle those sessions.
-
-Use the normal single-row workflow when the user has not explicitly requested a batch. In either mode, the review gate and safety rules remain unchanged.
+- Assign exactly one worker to one eligible row. Keep a stable coordinator mapping of `worker -> row -> company -> role -> job_url -> Chrome tab -> Chrome group -> state`. Never duplicate a row or transfer a live application between workers.
+- Use one external Chrome window. Give each active worker exactly one visible tab in its own expanded one-tab group named `Apply — <Role> — <Worker> — R<n>`. Use the actual worker name when available; otherwise use stable labels such as `Agent 1`. Keep all active groups visible and never exceed one live application tab per worker or six application tabs total.
+- Navigate the worker's existing tab through the complete application flow, including review and confirmation. Do not open the next queued job early. If a site opens a child tab, continue in one chosen owned tab and close the extra after preserving the needed state.
+- Let workers progress independently. A worker may be `filling`, `ready for review`, `awaiting user answer`, `blocked`, `verifying submission`, or `recording outcome`. Site-specific assumptions and answers must stay with that worker's row.
+- Hold the worker, tab, and group at the current job while it is ready for review or has a resumable blocker such as an unknown required field, CAPTCHA, login handoff, or temporary site problem. Notify the user and resume the same worker after the user resolves it; do not replace the job or reclaim the slot.
+- Accept approval or manual-submission reports for one or several jobs in the same user message. Resolve each named company, role, or row against the active mapping; ask only when the target is ambiguous. Approval applies only to the named jobs and does not release other review-gated workers.
+- Treat a broad instruction to start, continue, or apply to the queue as permission to fill forms only, not to submit them. Every final submission requires approval that identifies the active job, although one message may identify several jobs.
+- When the user authorizes the worker to submit, click the final control and verify the resulting confirmation. When the user says they manually submitted one or more jobs, inspect each matching live tab for confirmation before recording it. The user's message alone is not proof of submission.
+- Keep the owning worker assigned through the sheet write. Author that row's result, route the mutation through the shared updater, and re-read the affected row. Serialize updater calls when several workers finish together. Do not release a slot until the intended values are verified and unrelated fields are unchanged.
+- After a verified submission is recorded, close that job's tab and group, then let the same worker open the next eligible job in a new tab and newly named group. For a terminal closed or unsuitable job, first record and verify the terminal outcome, then recycle the slot. For any other blocker, recycle only when the user explicitly chooses to abandon or skip it and the required note is recorded.
+- If fewer than six workers are available in the host, use the available limit and report it. A smaller user-requested concurrency is allowed; never exceed six.
 
 When the site confirms a submission, update both application markers (through the shared updater — see [Applying Updates](#applying-updates)):
 
@@ -97,8 +100,9 @@ Filling is autonomous; submitting is not. Complete every step of the form, but s
 
 - Intermediate `Next`/`Continue`/`Save and continue` clicks that only advance steps are fine. If it is unclear whether a button finalizes the submission, treat it as final and stop first.
 - When the form is ready, report the company, role, current form state, the answers given to any non-default or judgment-call questions, and anything uncertain — then wait for the user.
-- Submit only after the user approves. If the user asks for changes, apply them and present the form again.
-- Skip the review pause only when the user explicitly says in the current request to submit without review.
+- Submit only after the user approves the specific job. The user may approve several named active jobs in one message; handle and verify each independently. If the user asks for changes, apply them and present the form again.
+- Keep each review-gated worker's tab and group visible and occupied until its submission is confirmed and its sheet row is updated and verified.
+- Do not skip the review pause based on a broad run instruction. Require job-specific approval at the gate; one approval message may name several active jobs.
 
 ## Unknown-Field Blockers
 
@@ -121,9 +125,9 @@ Generate cover letters lazily, only when an application form actually exposes a 
 - Do not use scripts or API generators to write the prose; tools may only save the file, extract or convert text, check word count, and update the sheet cell.
 - If the form has no cover-letter field, do not generate a letter and leave `cover_letter_path` unchanged.
 
-## Success-Seeking Mode
+## Queue Continuation
 
-When the user asks to try the rest, continue from the latest/bottom rows upward until the requested batch is prepared, one application reaches the review gate fully filled, or no candidate rows remain. Do not stop the batch just because one row is blocked, closed, or application-disqualified. In explicit batch mode, process up to five application tabs in parallel and pause after the batch; otherwise work one application at a time. Record each processed row before moving to the next batch.
+When the user asks to try the rest or gives a multi-job scope, continue from the latest/bottom eligible rows upward until the requested queue is exhausted, no candidates remain, or the user stops the run. Do not stop independent workers because another worker is blocked, closed, or application-disqualified. Keep at most six jobs active; replenish only slots whose prior outcomes have been recorded and verified. Never pause the entire pool merely because some workers are at review gates.
 
 ## Application Route Preference
 
@@ -138,20 +142,21 @@ Prefer a company, recruiter, ATS, or employer website application form over Link
 
 1. Identify the target sheet tabs from the user's request or current-sheet reference.
 2. Ensure `applied_at` and `application_notes` columns exist on each target tab.
-3. Select candidate rows using the rules above.
-4. For each candidate, read the full row, resume, cover letter, and application defaults page.
-5. Open the `job_url` in the available browser or automation surface when remote cookies, logins, or user profile state may matter. Preserve the authenticated session and use the site's own application route when possible.
+3. Select candidate rows using the rules above, seed up to six worker slots, and freeze the active worker-to-row mapping.
+4. For each active candidate, read the full row, resume, cover letter, and application defaults page.
+5. Open each `job_url` in its worker's single grouped tab in the user's external Chrome window. Preserve the authenticated session and use the site's own application route when possible.
 6. Find the preferred apply entry point using the route preference above. If the job is closed, unavailable, no longer accepting applications, or redirects to a dead posting, write the reason, set the row to a terminal non-candidate status, and leave `applied_at` blank.
 7. Fill the form iteratively. For multi-step forms, complete the current visible section, click the next/continue/apply button, inspect new required fields and validation errors, then repeat until a final submission or blocker.
 8. Upload the resume PDF when requested. When the form asks for a cover letter, follow the Cover-Letter Handling section: reuse the existing letter when `cover_letter_path` already points to a file, otherwise generate and save one and record its path before continuing. Upload the cover-letter PDF directly when `cover_letter_path` points to a PDF; when it points to Markdown and the site requires a file upload, create a simple same-basename PDF derivative only for upload, preserving the Markdown source and sheet path. For cover-letter text boxes, paste the cover-letter text; extract text first if the stored file is a PDF.
 9. Answer dynamic free-text questions from the resume, performance-review evidence if already available, the row description, and the cover letter. Keep answers truthful, concise, and specific to the job.
-10. When all required fields are filled truthfully and no blocker remains, stop at the final submit control and present the application per the review gate. Submit only after the user approves, or when the user explicitly asked up front to submit without review.
-11. After the user approves and the site confirms the submission, set `job_status` to `Applied`, set `application_result` to `Resume Send`, write `applied_at` with the current sheet-local datetime, and write `application_notes` with the confirmation message, submitted URL, or a short success note — applying all four in one shared-updater call ([Applying Updates](#applying-updates)).
-12. If blocked, classify the blocker:
+10. When all required fields are filled truthfully and no blocker remains, stop at the final submit control, keep that worker's tab visible, and present the application per the review gate. Submit only after the user approves that specific active job; a single approval message may name several jobs.
+11. After the user approves and the site confirms the submission, keep the worker assigned while setting `job_status` to `Applied`, `application_result` to `Resume Send`, `applied_at` to the current sheet-local datetime, and `application_notes` to the confirmation message, submitted URL, or a short success note — applying all four in one shared-updater call ([Applying Updates](#applying-updates)). Re-read and verify the row.
+12. Only after successful row verification, close the completed tab/group and assign that same worker the next eligible row in a new tab/group. Re-refresh and re-resolve the next row before assigning it.
+13. If blocked, classify the blocker:
     - For a required field with no known truthful answer, follow the unknown-field blocker flow: fill everything else, keep the form open, and ask the user instead of abandoning the row.
     - For application-discovered disqualifiers, write the reason, set the row to `Not Suitable`, and leave `applied_at` blank.
     - For closed, removed, or no-longer-accepting postings, write the reason and set the row to `Closed` when the sheet already uses that status; otherwise set `Not Suitable`.
-    - For CAPTCHA, account creation, browser/login problems, or temporary site failures, write `application_notes` only and leave the row retryable.
+    - For CAPTCHA, account creation, browser/login problems, or temporary site failures, write `application_notes` only, leave the row retryable, keep its tab/group visible, and keep the worker assigned until the user resolves or explicitly skips it.
 
 ## Form-Filling Lessons
 
@@ -162,7 +167,7 @@ These are recurring implementation rules learned from live applications:
 - Workday month/year fields may reject direct typing or produce invalid dates. Use the visible calendar picker, navigate with Previous/Next Year, select the month, then verify the rendered `MM/YYYY` value for every employment entry before continuing.
 - After clicking a form's Save/Continue control, allow the page to finish its asynchronous transition and verify the active progress step. A disabled button or stale snapshot does not mean the step failed.
 - Leave optional salary fields blank when the form does not mark them required. Do not infer willingness for hybrid/office schedules or an exact start date from the fact that the role is in the UK; ask when the form requires those answers and the defaults do not define them.
-- Do not create an account or enter credentials to overcome a login gate. Leave Amazon.jobs, Workday, or other sign-in tabs open, record the exact sign-in/account blocker, and continue the batch where possible.
+- Do not create an account or enter credentials to overcome a login gate. Leave Amazon.jobs, Workday, or other sign-in tabs open in the owning worker's slot, record the exact blocker, and continue the other workers where possible.
 - Do not check arbitration, personal-completion, accuracy, or other legal attestations that require the applicant to have personally read or completed them. Leave them for the user unless the text is a standard, truthful privacy/consent acknowledgement already covered by the workflow.
 - Optional demographic fields should remain blank or use a neutral `Prefer not to answer` option when available. Do not guess demographic data.
 
@@ -170,7 +175,7 @@ These are recurring implementation rules learned from live applications:
 
 These rules were added after the 2026-08-02 application session; candidate-specific values belong in `wiki/topics/job-application-form-defaults.md` rather than in this skill:
 
-- When the user requests Chrome, use the external Chrome session for all application tabs and preserve tabs that need review, CAPTCHA completion, or handoff. Do not switch those tabs to the in-app Browser.
+- Use the user's external Chrome session and one window for all application tabs. Preserve and keep visible every tab that needs review, CAPTCHA completion, user input, or handoff. Do not switch those tabs to the in-app Browser.
 - If the user says `submitted`, verify a confirmation page or a matched employer email before updating the sheet. A matched acknowledgement that the application was received or is under review counts as `Resume Send`; it is not a rejection.
 - Do not solve or bypass CAPTCHA. If the widget is missing or cannot be completed, leave the tab open, record the blocker in `application_notes`, and keep the row retryable.
 - When an ATS asks for document categories, assign the resume to `Lebenslauf` / Resume and the cover letter to `Anschreiben` / Cover letter, then verify both filenames/statuses.
@@ -200,4 +205,4 @@ When marking a row unsuitable, update the status column (`job_status`, or the st
 
 ## Reporting
 
-End with counts for submitted, awaiting review, awaiting a user answer, blocked, skipped, failed rows, and cover letters generated. Include row numbers, company names, the specific questions waiting on the user, and the exact blockers that require user input.
+End with counts for submitted, awaiting review, awaiting a user answer, blocked, skipped, failed rows, and cover letters generated. Include the active `worker -> row -> company -> role -> group -> state` mapping, the number of occupied and available slots, the specific questions waiting on the user, and the exact blockers that require user input. When several jobs are approved or reported submitted together, report the verification and sheet-write result for each job separately.

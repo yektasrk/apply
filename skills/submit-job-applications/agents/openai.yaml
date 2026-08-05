@@ -1,4 +1,4 @@
 interface:
   display_name: "Submit Job Applications"
-  short_description: "Fill applications website-first; submit after user review"
-  default_prompt: "Use $submit-job-applications to fill suitable applications in batches of up to five, generating a tailored cover letter on demand when a form asks for one and saving its path to the sheet, keep the batch tabs open, prefer company website forms over LinkedIn Easy Apply, pause for my review before final submission, ask about unknown required fields, and record blockers or closed/unsuitable rows with reasons."
+  short_description: "Run six visible job-application workers"
+  default_prompt: "Use $submit-job-applications to run the default rolling pool of up to six visible external-Chrome workers, keep each job at its review or blocker gate, verify approved submissions, record each outcome in the sheet, and only then recycle that worker slot."
