@@ -14,7 +14,7 @@ The tracked Python app lives in `job_finder/`. Personal material — CVs,
 
 ```text
 apply/
-├── job_finder/            # Scraping, dedupe, sheet writes, availability checks
+├── job_finder/            # Scraping, dedupe, sheet writes, availability, cleanup
 ├── skills/                # Canonical tool-neutral agent skills (source of truth)
 ├── .codex/skills/         # Codex discovery mirror (symlinks into skills/)
 ├── .claude/skills/        # Claude discovery mirror (symlinks into skills/)
@@ -114,9 +114,37 @@ The dedup lookback derives from `HOURS_OLD` (7 days at the default 36h) rather
 than being hardcoded, so it cannot drift when `HOURS_OLD` changes.
 
 `job_finder/archive.py` provides the plumbing — country tabs, appends with
-read-back verification, archived-URL collection. **The command that actually
-moves rows is not built yet**, so nothing is archived today and the archive sheet
-is empty.
+read-back verification, archived-URL collection. `job_finder/cleanup.py` is the
+command that moves rows; see [Cleanup](#cleanup).
+
+## Cleanup
+
+`cleanup.py` performs two separate operations, neither on by default, and neither
+wired into CI — run them by hand at a session boundary:
+
+```bash
+python -m job_finder.cleanup --country denmark --archive-unsuitable --dry-run
+python -m job_finder.cleanup --country denmark --archive-unsuitable
+```
+
+`--archive-unsuitable` copies `Not Suitable` rows to the archive spreadsheet and
+then deletes them from the live sheet. It is safe to repeat: a row whose
+`job_url` is already archived is skipped rather than duplicated.
+
+`--purge-closed` deletes `Closed` rows outright and requires an explicit
+`--one-time-migration` flag. It exists for the backlog that accumulated while
+the availability checker still overwrote every status. Now that the checker only
+touches `Suitable` rows, a `Closed` row is a job you wanted and are keeping —
+running this again would delete exactly those.
+
+Both operations skip rows carrying an application, nothing is deleted until the
+archive append has been verified by read-back, and deletes run bottom-up in
+contiguous batches so row numbers stay valid mid-run. `--dry-run` reports without
+writing and `--limit` caps rows per tab.
+
+**Do not run this while a triage or submit session is in flight.** Those
+workflows address rows by absolute row number, and deleting rows shifts
+everything beneath.
 
 ## Sheet Status Contract
 
@@ -127,7 +155,7 @@ fields consistently:
 | --- | --- |
 | `job_status` | Suitability and lifecycle status: `Suitable`, `Not Suitable`, `Closed`, or `Applied` |
 | `suitability_reason` | Sheet-visible explanation for a suitability decision |
-| `application_result` | Application outcome; confirmed submissions use `Resume Send` |
+| `application_result` | Application outcome: `Resume Send` on confirmed submission, later `Resume Reject` or `Online Meeting` once reconciled from email |
 | `cover_letter_path` | Absolute path to the generated cover letter |
 | `applied_at` | Sheet-local timestamp written after a confirmed submission |
 | `application_notes` | Confirmation, blocker, or other application context |
@@ -175,6 +203,7 @@ the skill directly.
 | --- | --- |
 | `triage-job-applications` | Review open rows against the resume and evidence; writes `Suitable`/`Not Suitable` with a reason |
 | `submit-job-applications` | Apply to suitable rows: fills forms, uploads materials, generates a cover letter on demand, stops at the final submit for review, records the outcome only after confirmation |
+| `gmail-job-application-reconcile` | Classify recent job-application email, sync defensible outcomes into `application_result`, and file the messages under the `Apply!` Gmail label |
 | `report-job-market` | Analyze triaged rows, rejection reasons, demanded skills, and learning gaps into `wiki/queries/job-market-fit-report.md`; never writes back to Sheets |
 | `wiki-read` | Answer questions from the local wiki with page citations, without modifying it |
 | `wiki-maintain` | Ingest a source or file a durable answer; updates pages, `wiki/index.md`, and the append-only `wiki/log.md` |
@@ -184,6 +213,8 @@ The application skills are intentionally sequential:
 
 ```text
 scrape → triage → fill application (+ cover letter when the form asks) → user review → submit → record outcome
+              │                                                                                      │
+              │                                                            reconcile email outcomes ─┘
               └──────────────────── report market / maintain wiki ────────────────────┘
 ```
 
