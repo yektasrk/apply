@@ -1,13 +1,13 @@
 ---
 name: triage-job-applications
-description: Triage job rows in the local job finder Google Sheet against the user's resume and evidence, and mark each row Suitable or Not Suitable with a sheet-visible reason. Use when the user asks to review job listings, decide whether jobs are worth applying to, update suitability in the sheet, or continue the sheet triage workflow. Cover letters are generated later by the submit skill when an application form asks for one.
+description: Triage job rows in the local job finder Google Sheet against the user's resume and evidence, mark each row Suitable or Not Suitable with a sheet-visible reason, then archive the rejected rows to the archive spreadsheet. Use when the user asks to review job listings, decide whether jobs are worth applying to, update suitability in the sheet, archive not-suitable rows, or continue the sheet triage workflow. Cover letters are generated later by the submit skill when an application form asks for one.
 ---
 
 # Triage Job Applications
 
 ## Overview
 
-Use this skill to run the triage stage of the user's job-application workflow from the Google Sheet: classify open job rows and write visible reasoning back to the sheet. Cover letters are no longer generated here; the submit skill writes a tailored letter at apply time only when an application form asks for one.
+Use this skill to run the triage stage of the user's job-application workflow from the Google Sheet: classify open job rows, write visible reasoning back to the sheet, then move the rejected rows to the archive spreadsheet. Cover letters are no longer generated here; the submit skill writes a tailored letter at apply time only when an application form asks for one.
 
 You write the suitability reasoning and rejection reasons yourself after reading the full job description, resume, and any available performance-review evidence. Do not call local scripts, external generator projects, automated scoring systems, or API-based generation to produce those substantive outputs unless the user explicitly reverses this requirement.
 
@@ -36,6 +36,8 @@ The `cover_letter_path` column is owned by the submit skill; triage neither read
 
 `Not Suitable` rows are moved to a separate archive spreadsheet and deleted from the live sheet, so a row you reject will not stay where you wrote it. Two consequences for triage: the `suitability_reason` you write is the permanent record of that decision — the row's other columns survive too, but the reason is the only part anyone reads again — and a job missing from a tab may have been rejected earlier rather than never seen, so check the archive before concluding a job is new. Dedup already accounts for this: the scraper will not re-import an archived job.
 
+Triage is what performs that move, as its last step — see [Archiving After Triage](#archiving-after-triage).
+
 ## Workflow
 
 1. Locate the spreadsheet and tabs from the workspace configuration or the user's request. Prefer a connected Google Sheets/Drive tool when available; otherwise use the local service-account credentials (`service_account.json` at the repo root, read through the helpers in `job_finder/sheets.py`) without copying secrets into outputs.
@@ -46,7 +48,42 @@ The `cover_letter_path` column is owned by the submit skill; triage neither read
 6. Apply the rubric in [rubric.md](references/rubric.md) directly in your own reasoning. Do not use a script or scoring function to generate the decision or reason. Pay particular attention to the language-requirement rules there: reject for non-English language only when the full description states a hard requirement, not because the posting is in a local language, mentions local offices/customers, or offers a translated version.
 7. Decide `Suitable` or `Not Suitable` for each row and author the reason yourself. For not-suitable rows, write a concise, specific explanation that names the actual blocker from the job text. Do not use generic fallback wording. For suitable rows, leave the reason blank or write a short positive rationale if useful.
 8. Apply every sheet change with `scripts/apply_sheet_updates.py` rather than writing cells by hand or authoring a one-off script. Collect your authored decisions into a JSON file and run the script; it maps columns by header name, enforces the safety guards, writes the cells, and reads them back to verify. Fix any reported mismatch before finishing. See [Applying Updates](#applying-updates).
-9. Report counts: rows reviewed, suitable, not suitable, rows skipped, and any failures needing attention.
+9. Archive the rows you just marked `Not Suitable`, once every write has been applied and verified. See [Archiving After Triage](#archiving-after-triage). Skip this step — and say so — if any write failed verification.
+10. Report counts: rows reviewed, suitable, not suitable, rows skipped, rows archived and deleted per tab, and any failures needing attention.
+
+## Archiving After Triage
+
+Triage ends by moving the `Not Suitable` rows it just wrote to the archive spreadsheet and deleting them from the live sheet, using the `job_finder.cleanup` CLI. Run it once per triaged tab.
+
+**This must be the last thing the run does.** Deleting rows shifts every row number beneath the deletion, so anything still addressing rows by number — a pending batch of your own updates, a submit session, a scrape — lands on the wrong job. Concretely: every `apply_sheet_updates.py` call must have completed and verified first, and there must be no submit session open. Do not archive between batches; archive after the final batch.
+
+Unlike `apply_sheet_updates.py`, this CLI reads the sheet ids from the environment only, while the workspace keeps them in the gitignored `config_local.py`. So export them first, in the same shell:
+
+```bash
+export $(.venv/bin/python -c "import config_local as c; print(f'GOOGLE_SHEET_ID={c.GOOGLE_SHEET_ID}'); print(f'GOOGLE_ARCHIVE_SHEET_ID={c.GOOGLE_ARCHIVE_SHEET_ID}')")
+```
+
+Without `GOOGLE_ARCHIVE_SHEET_ID` the CLI refuses to run rather than degrading quietly — dedup reads the archive sheet, so archiving without it would make the next scrape re-import every row just archived.
+
+Then dry run, check the count, and run for real:
+
+```bash
+.venv/bin/python -m job_finder.cleanup --country germany --archive-unsuitable --dry-run
+```
+
+```bash
+.venv/bin/python -m job_finder.cleanup --country germany --archive-unsuitable
+```
+
+`--country` takes a configured country key (`germany`, `uk`, `netherlands`, …); use `--tab "Germany"` to name a tab directly. With neither, it walks every configured tab — do not do that after triaging one country.
+
+The dry run reports how many rows it would archive. Expect **at least** as many as you just marked `Not Suitable`: it also sweeps rejections left behind by earlier sessions, which is intended. A count *lower* than what you just wrote means some of your writes did not land — investigate before running for real.
+
+The CLI carries its own safety guards and you do not need to pre-filter for them: rows carrying an application (`Applied` status, or a nonblank `application_result` / `applied_at`) are never touched, rows with a blank `job_url` are left alone, nothing is deleted until the archive append is verified by read-back, and every target row's `job_url` is re-checked against the live sheet immediately before the delete. It is safe to re-run — a row already archived is deleted but not archived twice.
+
+Report the archived and deleted counts per tab. If the CLI aborts with `sheet changed since it was read`, something wrote to the tab mid-run: re-read and re-run rather than forcing it through.
+
+Do not pass `--purge-closed`. That deletes `Closed` rows with no archive copy and is a one-time migration, unrelated to triage.
 
 ## Applying Updates
 
@@ -86,7 +123,7 @@ The script enforces the Sheet Contract guards for you: it skips any row whose `a
 
 Before writing a row, re-check the current sheet values if there is any chance the user edited the sheet during the run. Do not change rows with nonblank `application_result`. The updater re-reads the sheet at apply time and enforces this guard (plus terminal-status and `cover_letter_path` protection), so routing writes through it is what keeps concurrent edits safe.
 
-**Row numbers are not stable identifiers.** The updater addresses cells by row number. If rows are deleted from the tab between the read that produced your decisions and the write that applies them — a `cleanup --archive-unsuitable` run, or the user deleting rows — every decision below the deletion point lands on a different job. Plain read-back cannot catch this: the cell does hold the value you sent, it is simply the wrong row.
+**Row numbers are not stable identifiers.** The updater addresses cells by row number. If rows are deleted from the tab between the read that produced your decisions and the write that applies them — a `cleanup --archive-unsuitable` run, or the user deleting rows — every decision below the deletion point lands on a different job. Plain read-back cannot catch this: the cell does hold the value you sent, it is simply the wrong row. This is why [Archiving After Triage](#archiving-after-triage) is the last step and never runs between batches: the archive step is itself a `cleanup --archive-unsuitable` run, and would otherwise pull the rows out from under your own pending writes.
 
 `job_url` is the stable key, so give every update an `expect` block naming it (see [Applying Updates](#applying-updates)). The script then verifies identity before writing anything and again after, and aborts the whole run on mismatch rather than corrupting rows. Concretely:
 
