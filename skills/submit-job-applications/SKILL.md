@@ -77,7 +77,13 @@ Author the values, put them in a JSON file, and run it from the repo root:
 .venv/bin/python3 skills/triage-job-applications/scripts/apply_sheet_updates.py --input updates.json
 ```
 
-Add `--check` for a dry run that prints planned writes without touching the sheet. Every key other than `row` is a column header name matched against the tab's header row, so one call can set several columns on a row at once — for example a confirmed submission:
+Add `--check` for a dry run that prints planned writes without touching the sheet. Every key other than `row` and `expect` is a column header name matched against the tab's header row, so one call can set several columns on a row at once.
+
+Always include an `expect` block carrying the row's `job_url`. Row numbers shift whenever rows are deleted from the tab — an archive/cleanup run, or the user editing the sheet — and without `expect` the write silently records your submission against a different job. `expect` is verified before and after the write, and aborts the run on mismatch. This matters more here than in triage: a misplaced write marks the wrong job as applied and hides the one you actually submitted.
+
+This is enforced: the script refuses any update without `expect.job_url` and writes nothing, before it even reads the sheet. Capture the `job_url` when you pick the row up for the worker, and carry it through to the outcome write. `"allow_missing_expect": true` overrides the check, but it is for a single hand-checked row you are looking at — never reach for it to make a batch go through.
+
+A confirmed submission then looks like this:
 
 ```json
 {
@@ -85,7 +91,8 @@ Add `--check` for a dry run that prints planned writes without touching the shee
   "updates": [
     {"row": 42, "job_status": "Applied", "application_result": "Resume Send",
      "applied_at": "2026-07-24 15:30 Asia/Tehran",
-     "application_notes": "Submitted via Greenhouse; confirmation page shown."}
+     "application_notes": "Submitted via Greenhouse; confirmation page shown.",
+     "expect": {"job_url": "https://www.linkedin.com/jobs/view/4448866107"}}
   ]
 }
 ```
