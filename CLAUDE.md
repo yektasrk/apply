@@ -13,10 +13,8 @@ Claude-specific notes here.
 - Claude discovers project skills in `.claude/skills/`. This repo keeps the
   canonical, tool-neutral skills in `skills/` and mirrors them into both
   `.codex/skills/` and `.claude/skills/`, so **`skills/` is the single source
-  of truth** — edit skills there and both tools stay in sync. The available
-  skills are: `wiki-read`, `wiki-maintain`, `wiki-evolve`,
-  `triage-job-applications`, `submit-job-applications`, and
-  `report-job-market`.
+  of truth** — edit skills there and both tools stay in sync. `AGENTS.md` lists
+  the available skills.
 - **One-time setup:** run `bash setup-agent-skills.sh` from the repo root to
   create both per-tool mirrors (symlinks into `skills/`, with a copy fallback
   for filesystems without symlink support). Re-run it after adding a new skill

@@ -8,24 +8,38 @@ Use the wiki for accumulated knowledge that should outlive a chat thread: source
 
 ## Workstation Skills
 
-Three wiki skills support this wiki. They live canonically in `skills/` and are mirrored into `.codex/skills/` and `.claude/skills/` via `setup-agent-skills.sh`:
+Skills live canonically in `skills/` and are mirrored into `.codex/skills/` and `.claude/skills/` via `setup-agent-skills.sh`. Three maintain this wiki:
 
 - `wiki-read`: answer questions from the wiki with cited page links.
 - `wiki-maintain`: ingest sources, file durable answers, and update wiki pages.
 - `wiki-evolve`: lint, repair, and improve the wiki schema or structure.
+
+Four more run the job-application pipeline over the Google Sheets described in `README.md`. They are not wiki skills, but they read wiki knowledge for answer defaults and one writes back into `wiki/queries/`:
+
+- `triage-job-applications`: mark sheet rows `Suitable` / `Not Suitable` with a sheet-visible reason.
+- `submit-job-applications`: fill applications, write cover letters into `cover_letters/`, and record outcomes after a review gate.
+- `gmail-job-application-reconcile`: classify application email and sync defensible outcomes to the sheet.
+- `report-job-market`: aggregate triaged rows into `wiki/queries/job-market-fit-report.md`.
+
+Each skill carries its own operational procedure. This file is the schema those procedures defer to: the directory contract, page conventions, and log format below.
 
 ## Directory Contract
 
 - `raw/`: user-curated source material. Read from this directory, but do not edit, rename, delete, or reorganize files in it unless the user explicitly asks. Use `raw/assets/` for source images and attachments.
 - `wiki/`: agent-maintained markdown wiki. The agent may create and edit files here during wiki work.
 - `wiki/index.md`: content-oriented catalog. Update this after every ingest, page creation, page rename, or substantial wiki edit.
-- `wiki/log.md`: append-only chronological journal. Add one entry for every ingest, query filed to the wiki, lint pass, migration, or schema change. Every entry heading follows `## [YYYY-MM-DD] <type> | <Title>`, where `<type>` is one of `ingest`, `query`, `lint`, `schema`, or `migration`. This is the canonical log format; skills reference it rather than redefining it.
+- `wiki/log.md`: append-only chronological journal. Add one entry for every ingest, query filed to the wiki, lint pass, migration, or schema change. Every entry heading follows `## [YYYY-MM-DD] <type> | <Title>`, where `<type>` is one of `ingest`, `query`, `lint`, `schema`, `migration`, or `setup`. This is the canonical log format; skills reference it rather than redefining it.
 - `wiki/sources/`: one page per raw source or external source.
 - `wiki/entities/`: people, organizations, projects, systems, tools, places, and other named things.
 - `wiki/topics/`: concepts, themes, processes, comparisons, and synthesized knowledge.
 - `wiki/queries/`: durable answers or analyses that began as user questions.
 - `wiki/meta/`: wiki health, schema notes, open questions, and maintenance plans.
 - `wiki/templates/`: page templates. Use them as shape guidance, not rigid forms.
+- `wiki/README.md`: wiki overview page. Keep it aligned with this schema when the schema changes.
+- `cover_letters/`: agent-generated application material, filed as `<Country>/<Company>.md`. Never overwrite an existing letter.
+- `tasks/`: local-only session scratch for plans and working notes. Durable lessons do not belong here — put them in this file, the relevant skill, or the wiki.
+
+`raw/`, `wiki/`, `cover_letters/`, and `tasks/` are Git-ignored because they hold personal candidate data or session scratch. Never commit their contents.
 
 ## Page Conventions
 
@@ -59,52 +73,27 @@ Use Obsidian-style wikilinks for wiki concepts and entities, for example `[[Appl
 
 Do not present unsupported claims as settled facts. Factual claims should be traceable to a source page, a raw file, or a dated query entry. Mark weak claims with `needs-review`.
 
-## Ingest Workflow
+## Workflow Invariants
 
-Default to ingesting one source at a time unless the user asks for a batch.
+`wiki-maintain`, `wiki-read`, and `wiki-evolve` carry the step-by-step procedures. These invariants hold whether or not a skill is loaded:
 
-1. Identify the source in `raw/` or from the user-provided URL/text.
-2. Read the source carefully. If it contains images or attachments, inspect them when they carry substantive information.
-3. Create or update a page under `wiki/sources/` with a source summary, bibliographic metadata when available, key claims, and links to the raw file or URL.
-4. Update or create affected topic/entity pages. Integrate the source into the existing synthesis instead of only appending a new summary.
-5. Record contradictions, superseded claims, or uncertainty directly on the relevant pages.
-6. Update `wiki/index.md`.
-7. Append a `wiki/log.md` entry using:
+- **Read before writing.** Start from `wiki/index.md` and `rg` over `wiki/` to find related pages. Never create a page that duplicates one already there.
+- **Integrate, do not append.** A new source is merged into the existing synthesis on topic and entity pages, not bolted on as a second summary.
+- **Record conflict where it lives.** Contradictions, superseded claims, and uncertainty go on the affected page, not only in the log.
+- **Every write updates the index.** `wiki/index.md` must still describe the wiki after any ingest, page creation, rename, or substantial edit.
+- **Every operation appends one log entry**, in the canonical format:
 
 ```markdown
 ## [YYYY-MM-DD] ingest | Source or Batch Title
-```
-
-## Query Workflow
-
-When answering from the wiki:
-
-1. Read `wiki/index.md` first.
-2. Use `rg` over `wiki/` to find relevant pages.
-3. Read the most relevant pages before answering.
-4. Cite wiki pages or source pages in the answer with markdown links.
-5. Distinguish wiki-backed facts from inference.
-6. If the answer is a useful synthesis, ask whether to file it, or file it directly when the user asks. Store filed answers in `wiki/queries/` or merge them into an existing topic page.
-
-## Lint And Evolution Workflow
-
-Periodic health checks should look for:
-
-- Broken links and stale index entries.
-- Orphan pages with no incoming links.
-- Important concepts mentioned repeatedly but lacking pages.
-- Duplicate or overlapping pages that should be merged.
-- Contradictions between old and new claims.
-- Pages with missing frontmatter or missing source provenance.
-- Useful schema or workflow improvements.
-
-Write durable audit results to `wiki/meta/health.md`, update `wiki/index.md` if page status changes, and append a `wiki/log.md` entry using:
-
-```markdown
 ## [YYYY-MM-DD] lint | Scope
 ```
 
-Schema changes are allowed when the user asks to evolve the wiki or when repeated maintenance work reveals a clear improvement. Keep schema edits small, update this file and relevant skill instructions together when needed, and log the change.
+- **Answers cite their pages.** Cite wiki or source pages with markdown links, and distinguish wiki-backed fact from inference. File a durable answer in `wiki/queries/` or merge it into an existing topic page.
+- **Audits are durable.** Health-check results go to `wiki/meta/health.md`, not just the chat.
+
+Default to ingesting one source at a time unless the user asks for a batch. When a source carries images or attachments, inspect them when they hold substantive information.
+
+Schema changes are allowed when the user asks to evolve the wiki, or when repeated maintenance reveals a clear improvement. Keep them small, update this file and the affected skills together, and log the change.
 
 ## Operating Rules
 
