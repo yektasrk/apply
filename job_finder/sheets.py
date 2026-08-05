@@ -108,15 +108,13 @@ def get_known_urls(ws: gspread.Worksheet) -> set[str]:
     # so a module-level import would be circular.
     from . import archive
 
-    window_days = archive.dedup_window_days()
     live = get_existing_urls(ws)
-    archived = archive.get_archived_urls(window_days=window_days, tab_title=ws.title)
+    archived = archive.get_archived_urls(tab_title=ws.title)
     known = live | archived
     log.info(
-        "Dedup set: %d live + %d archived (last %d days) = %d unique URL(s).",
+        "Dedup set: %d live + %d archived = %d unique URL(s).",
         len(live),
         len(archived),
-        window_days,
         len(known),
     )
     return known

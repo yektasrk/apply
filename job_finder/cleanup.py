@@ -246,7 +246,7 @@ def _archive_unsuitable(ws: gspread.Worksheet, args: argparse.Namespace) -> dict
         return counts
 
     if selected:
-        archive.append_rows(ws.title, [s["record"] for s in selected], reason="not-suitable")
+        archive.append_rows(ws.title, [s["record"] for s in selected])
         counts["archived"] = len(selected)
 
     _verify_still_matches(ws, [(s["row"], s["url"]) for s in to_delete])

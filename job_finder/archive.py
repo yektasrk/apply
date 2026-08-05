@@ -10,13 +10,15 @@ file is the only remaining record of them. Two rules follow from that:
 - An append must be verified by read-back before the caller deletes the source
   row. Deletion is irreversible; a silent append failure would lose the row.
 
-Tabs mirror the live sheet's country tabs and are created on first use. The
-header is the live header plus `archived_at`, `archive_reason`, `source_tab`.
+Tabs mirror the live sheet's country tabs, share their exact header, and are
+created on first use. The header is deliberately identical: the archive tabs are
+Google Sheets Tables, a Table owns its header row, and any column written past
+the Table's definition gets silently auto-renamed to `Column N` — which on
+2026-08-05 cost the Denmark tab its extra columns and let dedup re-import 10
+archived jobs. Same columns as live, no such gap.
 """
 
-import datetime
 import logging
-import math
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -29,34 +31,9 @@ from .retries import RETRY
 
 log = logging.getLogger(__name__)
 
-ARCHIVE_EXTRA_COLUMNS = ["archived_at", "archive_reason", "source_tab"]
-ARCHIVE_HEADER = ["scraped_at"] + sheets.SHEET_COLUMNS + ARCHIVE_EXTRA_COLUMNS
+ARCHIVE_HEADER = ["scraped_at"] + sheets.SHEET_COLUMNS
 
-TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M UTC"
 DEFAULT_TAB_ROWS = 1000
-MIN_DEDUP_WINDOW_DAYS = 7
-
-
-def dedup_window_days() -> int:
-    """How far back dedup reads the archive.
-
-    A scrape only returns postings newer than `HOURS_OLD`, so a job archived
-    longer ago than that can never come back. Derived rather than hardcoded so
-    the window cannot drift out of sync when `HOURS_OLD` changes.
-    """
-    return max(MIN_DEDUP_WINDOW_DAYS, math.ceil(config.HOURS_OLD / 24 * 1.5))
-
-
-def _now() -> str:
-    return datetime.datetime.now(datetime.UTC).strftime(TIMESTAMP_FORMAT)
-
-
-def _parse_timestamp(value: str) -> datetime.datetime | None:
-    try:
-        parsed = datetime.datetime.strptime(value.strip(), TIMESTAMP_FORMAT)
-    except (ValueError, AttributeError):
-        return None
-    return parsed.replace(tzinfo=datetime.UTC)
 
 
 def _column_letter(index_zero_based: int) -> str:
@@ -103,18 +80,18 @@ def ensure_archive_tab(
         ws.append_row(ARCHIVE_HEADER, value_input_option="RAW")
         return ws
 
-    missing = [column for column in ARCHIVE_EXTRA_COLUMNS if column not in headers]
-    if missing:
+    if sheets.DEDUP_COLUMN not in headers:
         raise RuntimeError(
-            f"Archive tab '{tab_title}' is missing required column(s): "
-            f"{', '.join(missing)}. Add them to the right of the header row."
+            f"Archive tab '{tab_title}' has no '{sheets.DEDUP_COLUMN}' column. "
+            f"Every other column is matched by name and may be absent, but "
+            f"without this one an archived row cannot be deduped."
         )
     return ws
 
 
 @retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
-def _read_url_and_timestamp_columns(ws: gspread.Worksheet) -> list[tuple[str, str]]:
-    """Fetch only the `job_url` and `archived_at` columns from a tab.
+def _read_url_column(ws: gspread.Worksheet) -> list[str]:
+    """Fetch only the `job_url` column from a tab.
 
     Archived rows keep their full `description`, so reading whole rows here
     would pull megabytes just to collect URLs.
@@ -124,76 +101,58 @@ def _read_url_and_timestamp_columns(ws: gspread.Worksheet) -> list[tuple[str, st
         # An empty tab (e.g. the spreadsheet's default Sheet1) is not an archive
         # tab and holds no URLs; skip it without crying wolf on every read.
         return []
-    if "job_url" not in headers or "archived_at" not in headers:
-        log.warning("Archive tab '%s' is missing job_url/archived_at.", ws.title)
-        return []
+    if sheets.DEDUP_COLUMN not in headers:
+        # A tab that has a header but no job_url is damaged, and reading it as
+        # "no archived URLs" is the worst possible answer: dedup would wave
+        # through every job this tab was archived to protect. Fail loudly.
+        raise RuntimeError(
+            f"Archive tab '{ws.title}' has no '{sheets.DEDUP_COLUMN}' column. "
+            f"Dedup cannot read it, so archived jobs would be re-imported on the "
+            f"next scrape. Fix the header row before scraping."
+        )
 
-    url_letter = _column_letter(headers.index("job_url"))
-    stamp_letter = _column_letter(headers.index("archived_at"))
-    urls, stamps = ws.batch_get([f"{url_letter}2:{url_letter}", f"{stamp_letter}2:{stamp_letter}"])
-
-    pairs = []
-    for index in range(max(len(urls), len(stamps))):
-        url = urls[index][0] if index < len(urls) and urls[index] else ""
-        stamp = stamps[index][0] if index < len(stamps) and stamps[index] else ""
-        pairs.append((url.strip(), stamp.strip()))
-    return pairs
+    letter = _column_letter(headers.index(sheets.DEDUP_COLUMN))
+    (column,) = ws.batch_get([f"{letter}2:{letter}"])
+    return [cell[0].strip() for cell in column if cell and cell[0].strip()]
 
 
-def get_archived_urls(
-    window_days: int | None = None,
-    tab_title: str | None = None,
-) -> set[str]:
-    """Archived `job_url`s, optionally limited to one tab and a recent window.
+def get_archived_urls(tab_title: str | None = None) -> set[str]:
+    """Every archived `job_url`, optionally limited to one tab.
 
-    `window_days=None` reads every archived row and is what the archiver uses to
-    stay idempotent. Dedup passes a window so the read stays small.
+    Read in full rather than over a recent window. The read is a single column
+    of one country's tab, so the whole history costs about as much as a slice of
+    it, and a window can only ever under-include — which re-imports a dead job,
+    the failure this module exists to prevent.
 
     `tab_title` limits the read to one country. Live dedup is per-tab, so
     scraping one country never needs the other eight tabs. A country with
     nothing archived yet simply has no tab, which reads as an empty set.
     """
     spreadsheet = get_archive_spreadsheet()
-    cutoff = None
-    if window_days is not None:
-        cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=window_days)
-
     worksheets = spreadsheet.worksheets()
     if tab_title is not None:
         worksheets = [ws for ws in worksheets if ws.title == tab_title]
 
     urls: set[str] = set()
     for ws in worksheets:
-        for url, stamp in _read_url_and_timestamp_columns(ws):
-            if not url:
-                continue
-            if cutoff is not None:
-                archived_at = _parse_timestamp(stamp)
-                # An unparseable timestamp is kept: over-including costs a
-                # skipped duplicate, under-including re-imports a dead job.
-                if archived_at is not None and archived_at < cutoff:
-                    continue
-            urls.add(url)
+        urls.update(_read_url_column(ws))
     log.info("Found %d archived job URL(s).", len(urls))
     return urls
 
 
 def _next_empty_row(ws: gspread.Worksheet, headers: list[str]) -> int:
-    """First free row, measured by the `archived_at` column.
+    """First free row, measured by the `job_url` column.
 
-    Every row this module writes sets `archived_at`, so its length is exactly
-    the number of archived rows plus the header.
+    Rows reach the archive only via the cleanup CLI, which refuses to move a row
+    with a blank `job_url` (it could not be verified before deletion). So this
+    column's length is exactly the number of archived rows plus the header.
     """
-    stamp_index = headers.index("archived_at")
-    filled = ws.col_values(stamp_index + 1)
+    url_index = headers.index(sheets.DEDUP_COLUMN)
+    filled = ws.col_values(url_index + 1)
     return max(len(filled), 1) + 1
 
 
-def append_rows(
-    tab_title: str,
-    records: list[dict[str, str]],
-    reason: str,
-) -> list[str]:
+def append_rows(tab_title: str, records: list[dict[str, str]]) -> list[str]:
     """Append records to a country tab and verify them by read-back.
 
     `records` map live-sheet column names to values; columns are matched by name
@@ -207,21 +166,8 @@ def append_rows(
     spreadsheet = get_archive_spreadsheet()
     ws = ensure_archive_tab(spreadsheet, tab_title)
     headers = [str(value).strip() for value in ws.row_values(1)]
-    archived_at = _now()
 
-    values: list[list[str]] = []
-    for record in records:
-        row = []
-        for column in headers:
-            if column == "archived_at":
-                row.append(archived_at)
-            elif column == "archive_reason":
-                row.append(reason)
-            elif column == "source_tab":
-                row.append(tab_title)
-            else:
-                row.append(str(record.get(column, "")))
-        values.append(row)
+    values = [[str(record.get(column, "")) for column in headers] for record in records]
 
     start_row = _next_empty_row(ws, headers)
     end_row = start_row + len(values) - 1
@@ -251,7 +197,7 @@ def append_rows(
             + "; ".join(mismatches[:5])
         )
 
-    url_index = headers.index("job_url") if "job_url" in headers else None
-    archived_urls = [row[url_index].strip() for row in values] if url_index is not None else []
+    # ensure_archive_tab has already guaranteed this column exists.
+    url_index = headers.index(sheets.DEDUP_COLUMN)
     log.info("Archived %d row(s) to '%s' (verified).", len(values), tab_title)
-    return archived_urls
+    return [row[url_index].strip() for row in values]
