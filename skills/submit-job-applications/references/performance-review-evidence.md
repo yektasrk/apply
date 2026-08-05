@@ -10,7 +10,7 @@ When the user provides Google Docs performance reviews:
 
 1. Use the Google Drive/Docs connector to read each source document.
 2. Convert each document to markdown and save it in the project under `raw/performance-reviews/`.
-3. Use kebab-case filenames with a stable identifier, such as `2025-h1-performance-review.md` or `yektanet-2026-review.md`.
+3. Use kebab-case filenames that match the convention already in that directory: `pe-<period>-<year>.md`, where the year is the Jalali year used by the source reviews — for example `pe-winter-1403.md`, `pe-summer-1402.md`, or `pe-winter-1402-and-summer-1403.md` when one document covers two periods.
 4. Include basic provenance at the top of each markdown file: source title, Google Doc URL or ID, import date, and whether the content is complete or partial.
 5. Do not edit the imported meaning. Preserve factual content and mark any unclear extraction as `needs-review`.
 
