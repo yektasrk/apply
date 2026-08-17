@@ -19,7 +19,7 @@ Four more run the job-application pipeline over the Google Sheets described in `
 - `triage-job-applications`: mark sheet rows `Suitable` / `Not Suitable` with a sheet-visible reason.
 - `submit-job-applications`: fill applications, write cover letters into `cover_letters/`, and record outcomes after a review gate.
 - `gmail-job-application-reconcile`: classify application email and sync defensible outcomes to the sheet.
-- `report-job-market`: aggregate triaged rows into `wiki/queries/job-market-fit-report.md`.
+- `report-job-market`: aggregate triaged rows into `wiki/queries/job-market-fit-report.md`, overall and broken down per country and per month.
 
 Each skill carries its own operational procedure. This file is the schema those procedures defer to: the directory contract, page conventions, and log format below.
 
