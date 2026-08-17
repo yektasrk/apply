@@ -23,6 +23,29 @@ def _env_list(name: str, default: list[str]) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _sheet_setting(name: str, default: str = "") -> str:
+    """Resolve a Google Sheets setting: env, then `config_local.py`, then default.
+
+    CI is the real runtime for `job_finder.main` and passes these through the
+    workflow env, so env keeps precedence and this cannot change what a scheduled
+    scrape reads. `config_local.py` is git-ignored, so it simply does not exist
+    there — the fallback is inert in CI by construction.
+
+    Locally the opposite is true: there is no `.env`, and `config_local.py` is
+    where the real spreadsheet ids live. Without this fallback every skill that
+    wants the tracker has to re-implement the same lookup, which is exactly what
+    `skills/report-job-market/scripts/pull.py` was forced to do.
+    """
+    value = os.getenv(name)
+    if value:
+        return value
+    try:
+        import config_local  # type: ignore
+    except Exception:
+        return default
+    return getattr(config_local, name, None) or default
+
+
 # ── Per-country config ──────────────────────────────────────────────────────────
 # Each key is the country name you pass via --country
 # Each value overrides: location, sheet tab, and optionally search terms
@@ -118,17 +141,23 @@ TITLE_MISMATCH_REASON = "title missmatch"
 
 PROXIES: list[str] = _env_list("PROXIES", [])
 
-GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv(
-    "GOOGLE_SERVICE_ACCOUNT_FILE",
-    "service_account.json",
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Anchored at the repo root rather than the CWD. CI writes service_account.json
+# into the checkout root and runs from there, so this resolves to the same file
+# it always did; what changes is that a script invoked from another directory
+# (the skills under skills/*/scripts/) now finds it too.
+GOOGLE_SERVICE_ACCOUNT_FILE = os.path.join(
+    REPO_ROOT,
+    _sheet_setting("GOOGLE_SERVICE_ACCOUNT_FILE", "service_account.json"),
 )
-GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "")
-GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "")
+GOOGLE_SHEET_NAME = _sheet_setting("GOOGLE_SHEET_NAME")
+GOOGLE_SHEET_ID = _sheet_setting("GOOGLE_SHEET_ID")
 
 # Spreadsheet that not-suitable rows are moved to before being deleted from the
 # live sheet. Dedup reads it, so an unset value would silently re-import every
 # archived job on the next scrape — job_finder.archive raises instead.
-GOOGLE_ARCHIVE_SHEET_ID = os.getenv("GOOGLE_ARCHIVE_SHEET_ID", "")
+GOOGLE_ARCHIVE_SHEET_ID = _sheet_setting("GOOGLE_ARCHIVE_SHEET_ID")
 
 # ── Telegram ────────────────────────────────────────────────────────────────────
 # 1. Message @BotFather on Telegram → /newbot → copy the token
