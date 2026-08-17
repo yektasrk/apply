@@ -21,6 +21,12 @@ Claude-specific notes here.
   under `skills/`.
 - The `agents/openai.yaml` file inside some skills is Codex-only interface
   metadata; Claude ignores it.
+- **Skills do not name mail or connector tools.** Tool names differ per agent and
+  go stale faster than the workflows do, so a skill states the capability it needs
+  and you find the tool yourself. When a skill's rule depends on how a *service*
+  behaves rather than on which tool calls it — a query that fails silently, a
+  message too large to read — that belongs in the skill's `references/`, where it
+  applies to every agent. `gmail-job-application-reconcile` is the worked example.
 - `AGENTS.md` and the skills are written tool-neutrally ("the agent", "you") —
   every rule applies equally to Claude. If any stray "Codex" wording remains,
   read it as "the agent".

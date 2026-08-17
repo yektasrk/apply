@@ -20,6 +20,9 @@ tasks/
 # report-job-market scratch (default OUT_DIR for its pull/render scripts)
 .report_tmp/
 
+# gmail-job-application-reconcile scratch (default OUT_DIR for pull_rows.py)
+.reconcile_tmp/
+
 # Personal candidate data and generated application artifacts
 resume.md
 CV*.pdf
