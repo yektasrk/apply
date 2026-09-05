@@ -5,12 +5,15 @@ on:
     - cron: "0 0 * * *"   # netherlands
     - cron: "0 2 * * *"   # germany
     - cron: "0 4 * * *"   # uk
-    - cron: "0 6 * * *"   # denmark
-    - cron: "0 8 * * *"   # ireland
-    - cron: "0 10 * * *"  # sweden
-    - cron: "0 12 * * *"  # switzerland
-    - cron: "0 14 * * *"  # portugal
-    - cron: "0 16 * * *"  # france
+    # Paused 2026-09-06: the schedule is limited to netherlands, germany and
+    # uk. Re-enable a country by uncommenting its cron here *and* its branch in
+    # resolve-country below — a cron with no matching branch exits 1.
+    # - cron: "0 6 * * *"   # denmark
+    # - cron: "0 8 * * *"   # ireland
+    # - cron: "0 10 * * *"  # sweden
+    # - cron: "0 12 * * *"  # switzerland
+    # - cron: "0 14 * * *"  # portugal
+    # - cron: "0 16 * * *"  # france
   workflow_dispatch:
     inputs:
       country:
@@ -51,12 +54,13 @@ jobs:
                 "0 0 * * *") country="netherlands" ;;
                 "0 2 * * *") country="germany" ;;
                 "0 4 * * *") country="uk" ;;
-                "0 6 * * *") country="denmark" ;;
-                "0 8 * * *") country="ireland" ;;
-                "0 10 * * *") country="sweden" ;;
-                "0 12 * * *") country="switzerland" ;;
-                "0 14 * * *") country="portugal" ;;
-                "0 16 * * *") country="france" ;;
+                # Paused — kept in step with the commented crons above.
+                # "0 6 * * *") country="denmark" ;;
+                # "0 8 * * *") country="ireland" ;;
+                # "0 10 * * *") country="sweden" ;;
+                # "0 12 * * *") country="switzerland" ;;
+                # "0 14 * * *") country="portugal" ;;
+                # "0 16 * * *") country="france" ;;
                 *) echo "Unknown schedule: ${{ github.event.schedule }}" >&2; exit 1 ;;
               esac
               ;;
