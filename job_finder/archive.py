@@ -23,11 +23,11 @@ import logging
 import gspread
 from google.oauth2.service_account import Credentials
 from gspread.utils import rowcol_to_a1
-from tenacity import retry, retry_if_exception_type
+from tenacity import retry
 
 from . import config
 from . import sheets
-from .retries import RETRY
+from .retries import RETRY_TRANSIENT
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,17 @@ def _column_letter(index_zero_based: int) -> str:
     return rowcol_to_a1(1, index_zero_based + 1).rstrip("1")
 
 
+@retry(**RETRY_TRANSIENT)
 def get_archive_spreadsheet() -> gspread.Spreadsheet:
+    """Open the archive spreadsheet, retrying Google's transient failures.
+
+    `open_by_key` is not a local constructor: gspread fetches the spreadsheet
+    metadata inside it, so this is the first network call of the sheets phase
+    and the only one on the dedup path that used to run unguarded. Four
+    scheduled runs between 2026-09-03 and 2026-09-05 died here on a bare
+    `[503] The service is currently unavailable`, throwing away a scrape that
+    had already completed, while the reads one call later retried and survived.
+    """
     if not config.GOOGLE_ARCHIVE_SHEET_ID:
         raise RuntimeError(
             "GOOGLE_ARCHIVE_SHEET_ID is not set. Dedup reads the archive sheet; "
@@ -89,7 +99,7 @@ def ensure_archive_tab(
     return ws
 
 
-@retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
+@retry(**RETRY_TRANSIENT)
 def _read_url_column(ws: gspread.Worksheet) -> list[str]:
     """Fetch only the `job_url` column from a tab.
 

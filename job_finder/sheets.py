@@ -8,10 +8,10 @@ import logging
 import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
-from tenacity import retry, retry_if_exception_type
+from tenacity import retry
 
 from . import config
-from .retries import RETRY
+from .retries import RETRY_TRANSIENT
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +41,14 @@ DEDUP_COLUMN = "job_url"
 ROW_MARKER_COLUMNS = ("scraped_at", "title", "job_url")
 
 
+@retry(**RETRY_TRANSIENT)
 def get_spreadsheet() -> gspread.Spreadsheet:
+    """Open the live spreadsheet, retrying Google's transient failures.
+
+    Same exposure as `archive.get_archive_spreadsheet`: `open_by_key` fetches
+    metadata over the network, so a transient 503 here would kill the run
+    outright. This one has not been unlucky yet; guard it before it is.
+    """
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
@@ -75,7 +82,7 @@ def ensure_header(ws: gspread.Worksheet) -> list[str]:
     return headers
 
 
-@retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
+@retry(**RETRY_TRANSIENT)
 def get_existing_urls(ws: gspread.Worksheet) -> set[str]:
     """URLs already present in this live tab.
 
@@ -162,7 +169,7 @@ def _find_empty_rows(
 
 def _write_rows(ws: gspread.Worksheet, rows: list[list], headers: list[str]) -> None:
     """Expand the grid if needed, then write rows into the earliest empty rows."""
-    @retry(**RETRY, retry=retry_if_exception_type(gspread.exceptions.APIError))
+    @retry(**RETRY_TRANSIENT)
     def _do_write() -> None:
         all_values = ws.get_all_values()
         target_rows = _find_empty_rows(all_values, ws.row_count, len(rows), headers)
