@@ -202,7 +202,7 @@ the skill directly.
 | Skill | Use it for |
 | --- | --- |
 | `triage-job-applications` | Review open rows against the resume and evidence; writes `Suitable`/`Not Suitable` with a reason |
-| `submit-job-applications` | Apply to suitable rows: fills forms, uploads materials, generates a cover letter on demand, stops at the final submit for review, records the outcome only after confirmation |
+| `submit-job-applications` | Apply to suitable rows: fills forms with the Simplify extension first and completes the rest, uploads materials, writes a cover letter into every cover-letter field, stops at the final submit for review, records the outcome only after confirmation |
 | `gmail-job-application-reconcile` | Classify recent job-application email, sync defensible outcomes into `application_result`, and file the messages under the `Apply!` Gmail label |
 | `report-job-market` | Analyze triaged rows, rejection reasons, demanded skills, and learning gaps into `wiki/queries/job-market-fit-report.md`; never writes back to Sheets |
 | `wiki-read` | Answer questions from the local wiki with page citations, without modifying it |

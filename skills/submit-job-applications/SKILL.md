@@ -1,13 +1,13 @@
 ---
 name: submit-job-applications
-description: Run a rolling pool of up to six one-job workers that fill suitable job applications from the local job finder Google Sheet in the user's visible external Chrome window, generate tailored cover letters on demand, pause each application for user review before final submit, verify confirmed submissions, and record outcomes before reusing a worker slot. Use when the user asks to apply to jobs, submit applications, fill job application forms in the browser, upload the resume, generate a cover letter for an application, or continue the sheet-to-application workflow.
+description: Run a rolling pool of up to six one-job workers that fill suitable job applications from the local job finder Google Sheet in the user's visible external Chrome window — Simplify extension autofill first, then the remaining fields — write a tailored cover letter into every cover-letter field, pause each application for user review before final submit, verify confirmed submissions, and record outcomes before reusing a worker slot. Use when the user asks to apply to jobs, submit applications, fill job application forms in the browser, upload the resume, generate a cover letter for an application, or continue the sheet-to-application workflow.
 ---
 
 # Submit Job Applications
 
 ## Overview
 
-Use this skill to turn suitable sheet rows into applications that are completely filled and ready to send. Run one default rolling worker pool with at most six active jobs: each worker owns one visible external-Chrome tab and group until that job reaches a verified, recorded outcome. Fill visible fields, advance through multi-step forms, and resolve every answerable question, but gate the final submit on the user's review. When a form asks for a cover letter, generate it at that point, save it locally, record its path in the sheet, and place it in the form. Record a submission only after the user approves and the site confirms it, then verify the sheet write before releasing that worker to the next job.
+Use this skill to turn suitable sheet rows into applications that are completely filled and ready to send. Run one default rolling worker pool with at most six active jobs: each worker owns one visible external-Chrome tab and group until that job reaches a verified, recorded outcome. Start every form with the Simplify extension's autofill, then complete the fields it left, advance through multi-step forms, and resolve every answerable question, but gate the final submit on the user's review. When a form has a cover-letter field — required or optional — never leave it empty: generate the letter at that point, save it locally, record its path in the sheet, and write it into the form's text option, uploading a file only when no text option exists. Record a submission only after the user approves and the site confirms it, then verify the sheet write before releasing that worker to the next job.
 
 ## Required Context
 
@@ -17,7 +17,7 @@ Before applying, read (paths relative to the repo root):
 - `wiki/topics/job-application-form-defaults.md` for stable candidate details and fields that require user confirmation.
 - `resume.md` for factual evidence.
 - The row's `cover_letter_path` file when it is already populated from an earlier run.
-- [cover-letter-generation.md](references/cover-letter-generation.md) for when and how to write a cover letter for a form that asks for one.
+- [cover-letter-generation.md](references/cover-letter-generation.md) for how to write, save, and place the cover letter for a form with a cover-letter field.
 - [performance-review-evidence.md](references/performance-review-evidence.md), plus any performance-review markdown already in the workspace, used as cover-letter evidence only.
 - [browser-form-flow.md](references/browser-form-flow.md) before operating a web form.
 - [Codex browser and worker-pool notes](codex/browser-and-worker-pool.md) when running this skill in Codex; other agents should use their native browser and session-retention mechanisms while preserving the same pool invariants.
@@ -35,7 +35,7 @@ Select only rows where:
 - `applied_at` is blank or missing.
 - `application_result` is blank, unless the user explicitly asks to retry rows with an existing result.
 
-A blank `cover_letter_path` is no longer a reason to skip a row; the cover letter is written during the application when the form asks for one.
+A blank `cover_letter_path` is no longer a reason to skip a row; the cover letter is written during the application whenever the form has a cover-letter field, required or optional.
 
 Ensure these output columns exist before writing:
 
@@ -133,13 +133,27 @@ When a required field has no truthful answer in the wiki defaults, resume, cover
 
 If the user's answer is a stable personal fact (salary expectation, notice period, phone, an authorization detail), save it to `wiki/topics/job-application-form-defaults.md` afterwards so future runs answer it without asking. Blockers that a user answer cannot fix — closed postings, CAPTCHAs, required account creation, broken sites — follow the blocker classification in the workflow instead.
 
+## Simplify Autofill First
+
+**Always fill a form with the Simplify extension first, then complete the fields it left unfilled.** Simplify runs in the user's external Chrome with the user's saved profile and resume; it fills contact details, attaches the resume, and answers common questions far faster than field-by-field entry.
+
+1. Once the application form is on screen, find the Simplify panel the extension injects at the page's right edge (an in-page shadow root, `div.simplify-jobs-shadow-root`) and click its `Autofill This Page` button — `Run Autofill Again` after the first run. Do not confuse it with an ATS's own autofill control, such as Greenhouse's `Autofill my application` button inside the form; that is a different feature.
+2. Wait for it to finish (about 10 seconds), then read its summary: the `Completed` list and the `Need to review` list.
+3. Treat what Simplify filled as a draft, not a source. Check every filled value against [browser-form-flow.md](references/browser-form-flow.md) data sources — wiki defaults first, then the resume — and correct anything that disagrees, including answers it marks `Using Simplify AI` (work authorization, sponsorship, relocation).
+4. Fill every field it left blank or listed under `Need to review`, following the normal field handling. The cover letter is always yours: see [Cover-Letter Handling](#cover-letter-handling).
+5. On a multi-step form, run Simplify again on each new step before filling that step by hand.
+
+Do not use Simplify's writing features — `Refine with AI`, its cover-letter generator, or `Tailor Resume`. Cover-letter prose follows the generation boundary in [cover-letter-generation.md](references/cover-letter-generation.md), and the uploaded resume stays the user's own file.
+
+Only the in-page panel is reachable: the extension's toolbar icon is browser chrome that page tools cannot click. If no Simplify panel or launcher appears once the form has loaded, fill the form by hand and say so in the review-gate report. Anything that reloads the form wipes Simplify's values along with yours, so re-run it after any reload (see the embedded-iframe lesson under Form-Filling Lessons). In the review-gate report, name the fields you corrected or added after Simplify.
+
 ## Cover-Letter Handling
 
-Generate cover letters lazily, only when an application form actually exposes a cover-letter field (a file upload or a text box). Do not pre-generate letters for rows whose forms never ask for one. Follow [cover-letter-generation.md](references/cover-letter-generation.md) for the full rules; the essentials:
+Generate cover letters lazily, whenever an application form has a cover-letter field (a file upload or a text box), required or optional. **Never leave a cover-letter field empty**: an optional field is filled exactly like a required one. Do not pre-generate letters for rows whose forms have no cover-letter field. Follow [cover-letter-generation.md](references/cover-letter-generation.md) for the full rules; the essentials:
 
 - If the row's `cover_letter_path` is nonblank and the file exists, reuse that letter. Do not regenerate or overwrite it.
-- Otherwise write a new letter yourself from the resume, the full job description, and any reliable performance-review evidence, validate it against the word band (250-400 words) and quality bar before saving, then save it to `cover_letters/<Country>/<Company>.md` at the repo root and write its absolute path to `cover_letter_path` in the sheet through the shared updater ([Applying Updates](#applying-updates)) immediately after saving — before the application is submitted, so the letter is recorded even if the row later blocks.
-- Place the letter in the form: paste the text into a text box, or upload the file where a file is required. When the stored file is Markdown and the site needs a PDF/DOC, create a same-basename PDF derivative next to the Markdown for upload and keep the Markdown source as the sheet path.
+- Otherwise write a new letter yourself from the resume, the full job description, and any reliable performance-review evidence, validate it against the word band (250-400 words) and quality bar before saving, then save it to `cover_letters/<Country>/<Company>.md` at the repo root and write its absolute path to `cover_letter_path` in the sheet through the shared updater ([Applying Updates](#applying-updates)) immediately after saving — before the application is submitted, so the letter is recorded even if the row later blocks. When the job has no sheet row (the user gave a URL directly), still save the letter and report that no path was recorded.
+- Place the letter by writing it into the form first: paste the text into the field's text box, or open its `Enter manually` / `Paste` / `Type` option beside the upload buttons and paste there. Only when the field offers no text option, create a file and upload it — the existing PDF when `cover_letter_path` points to one, otherwise a same-basename PDF derivative next to the Markdown, keeping the Markdown source as the sheet path.
 - Do not use scripts or API generators to write the prose; tools may only save the file, extract or convert text, check word count, and update the sheet cell.
 - If the form has no cover-letter field, do not generate a letter and leave `cover_letter_path` unchanged.
 
@@ -164,8 +178,8 @@ Prefer a company, recruiter, ATS, or employer website application form over Link
 4. For each active candidate, read the full row, resume, cover letter, and application defaults page.
 5. Open each `job_url` in its worker's single grouped tab in the user's external Chrome window. Preserve the authenticated session and use the site's own application route when possible.
 6. Find the preferred apply entry point using the route preference above. If the job is closed, unavailable, no longer accepting applications, or redirects to a dead posting, write the reason, set the row to a terminal non-candidate status, and leave `applied_at` blank.
-7. Fill the form iteratively. For multi-step forms, complete the current visible section, click the next/continue/apply button, inspect new required fields and validation errors, then repeat until a final submission or blocker.
-8. Upload the resume PDF when requested. When the form asks for a cover letter, follow the Cover-Letter Handling section: reuse the existing letter when `cover_letter_path` already points to a file, otherwise generate and save one and record its path before continuing. Upload the cover-letter PDF directly when `cover_letter_path` points to a PDF; when it points to Markdown and the site requires a file upload, create a simple same-basename PDF derivative only for upload, preserving the Markdown source and sheet path. For cover-letter text boxes, paste the cover-letter text; extract text first if the stored file is a PDF.
+7. Fill the form iteratively, Simplify first: run Simplify autofill and check its output ([Simplify Autofill First](#simplify-autofill-first)), then complete the fields it left. For multi-step forms, repeat that on the current visible section, click the next/continue/apply button, inspect new required fields and validation errors, then repeat until a final submission or blocker.
+8. Upload the resume PDF when requested. Simplify attaches the resume stored in its own profile, which is not confirmed to be the CV in the wiki defaults; follow that page's open question on whether to keep it. When the form has a cover-letter field, required or optional, follow the Cover-Letter Handling section: reuse the existing letter when `cover_letter_path` already points to a file, otherwise generate and save one and record its path before continuing. Write the letter into the field's text box or `Enter manually` option first — extracting the text if the stored file is a PDF. Only when no text option exists, upload a file: the PDF directly when `cover_letter_path` points to one, otherwise a simple same-basename PDF derivative of the Markdown, preserving the Markdown source and sheet path.
 9. Answer dynamic free-text questions from the resume, performance-review evidence if already available, the row description, and the cover letter. Keep answers truthful, concise, and specific to the job.
 10. When all required fields are filled truthfully and no blocker remains, stop at the final submit control, keep that worker's tab visible, and present the application per the review gate. Submit only after the user approves that specific active job; a single approval message may name several jobs.
 11. After the user approves and the site confirms the submission, keep the worker assigned while setting `job_status` to `Applied`, `application_result` to `Resume Send`, `applied_at` to the current sheet-local datetime, and `application_notes` to the confirmation message, submitted URL, or a short success note — applying all four in one shared-updater call ([Applying Updates](#applying-updates)). Re-read and verify the row.
@@ -185,6 +199,7 @@ These are recurring implementation rules learned from live applications:
 - Workday month/year fields may reject direct typing or produce invalid dates. Use the visible calendar picker, navigate with Previous/Next Year, select the month, then verify the rendered `MM/YYYY` value for every employment entry before continuing.
 - After clicking a form's Save/Continue control, allow the page to finish its asynchronous transition and verify the active progress step. A disabled button or stale snapshot does not mean the step failed.
 - A clicked submit is not a submitted application. Always re-read the page after the final submit and confirm what it actually says: a form can accept every field, run its own server-side validation, and come back with a failure. Stedin returned `Het helaas is niet gelukt om je sollicitatie te versturen vanwege een ongeldig telefoonnummer` after Versturen and discarded the entered values, so the row would have been recorded as `Applied` on the strength of the click alone. Treat only an explicit success/confirmation state as a submission; anything else is still open.
+- Careers pages often embed the ATS form in a cross-origin iframe (Greenhouse's `grnhse_iframe` on sumup.com). Coordinate clicks and typing reach its fields, but DOM lookups and file inputs do not, so a file upload cannot target it — one more reason to paste the cover letter into its text option. Never navigate to the iframe's own URL to get at the inputs: on 2026-09-11 opening `job-boards.greenhouse.io/sumup/jobs/<id>` redirected back to the careers page and reloaded the form, wiping every Simplify and manual value. If a reload happens anyway, re-run Simplify and re-enter the manual answers.
 - Leave optional salary fields blank when the form does not mark them required. Do not infer willingness for hybrid/office schedules or an exact start date from the fact that the role is in the UK; ask when the form requires those answers and the defaults do not define them.
 - Do not create an account or enter credentials to overcome a login gate. Leave Amazon.jobs, Workday, or other sign-in tabs open in the owning worker's slot, record the exact blocker, and continue the other workers where possible.
 - Do not check arbitration, personal-completion, accuracy, or other legal attestations that require the applicant to have personally read or completed them. Leave them for the user unless the text is a standard, truthful privacy/consent acknowledgement already covered by the workflow.

@@ -4,19 +4,20 @@
 
 Use the same loop for single-page and multi-step application forms:
 
-1. Inspect the visible form state, required markers, current step label, validation messages, and enabled buttons.
-2. Fill every required field that has a supported answer.
-3. Save or autosave only when the site requires it to continue.
-4. Click the safest advancing control: `Next`, `Continue`, `Save and continue`, `Apply`, or `Submit application`.
-5. After navigation or DOM changes, inspect the new state before entering more data.
-6. If validation errors appear, fix fields only when the correct value is known from the approved sources.
-7. Continue until the form is fully filled and the next control would finalize the application, then stop for the review gate defined in SKILL.md. Click the final submit only after the user approves (or asked up front to skip review), and then wait for a confirmation page, email-confirmation message, or submitted-state screen.
+1. Run Simplify autofill on the visible form or step first, per the Simplify Autofill First section of SKILL.md, and read its `Completed` / `Need to review` summary.
+2. Inspect the visible form state, required markers, current step label, validation messages, and enabled buttons. Check each value Simplify filled against the data sources below and correct any that disagree.
+3. Fill every required field Simplify left that has a supported answer, and every cover-letter field whether required or not.
+4. Save or autosave only when the site requires it to continue.
+5. Click the safest advancing control: `Next`, `Continue`, `Save and continue`, `Apply`, or `Submit application`.
+6. After navigation or DOM changes, inspect the new state before entering more data, and run Simplify again on a new step.
+7. If validation errors appear, fix fields only when the correct value is known from the approved sources.
+8. Continue until the form is fully filled and the next control would finalize the application, then stop for the review gate defined in SKILL.md. Click the final submit only after the user approves (or asked up front to skip review), and then wait for a confirmation page, email-confirmation message, or submitted-state screen.
 
 Do not treat an intermediate `Next` click as a submission, and do not treat reaching the final page as done. Only write `applied_at` after the user approved the submit and the site confirms the final application was submitted. If it is unclear whether a button advances a step or finalizes the application, treat it as final and pause for review first.
 
 ## Data Sources
 
-Use stable values from `wiki/topics/job-application-form-defaults.md` first. Use `resume.md`, the current row, and the cover letter for job-specific content. Use performance-review markdown only if it is already in the workspace and directly relevant to a free-text prompt.
+Use stable values from `wiki/topics/job-application-form-defaults.md` first. Values Simplify autofills are a draft checked against these sources, never a source themselves. Use `resume.md`, the current row, and the cover letter for job-specific content. Use performance-review markdown only if it is already in the workspace and directly relevant to a free-text prompt.
 
 For dynamic free-text questions:
 
@@ -31,12 +32,12 @@ Answer exactly what each field asks; do not volunteer information the field did 
 
 - Name, email, LinkedIn, education, current role, and current employer: use the wiki defaults.
 - Resume/CV upload: upload the user's local resume or CV file.
-- Cover letter (any field): only forms with a cover-letter field trigger a letter. First obtain the letter per the Cover-Letter Handling section of SKILL.md and [cover-letter-generation.md](cover-letter-generation.md) — reuse the file when `cover_letter_path` already points to one, otherwise write and save it and record its path — then place it as below.
-- Cover letter text: paste the letter content as plain text. If the source is Markdown, remove Markdown headings only if they are formatting artifacts; preserve the letter text. If the source is PDF, extract the text before pasting.
-- Cover letter file upload: upload the PDF when `cover_letter_path` points to one. If the site requires PDF/DOC upload and the cover letter is Markdown, create a simple PDF derivative next to the Markdown file and upload that derivative.
+- Cover letter (any field, required or optional): never leave it empty. First obtain the letter per the Cover-Letter Handling section of SKILL.md and [cover-letter-generation.md](cover-letter-generation.md) — reuse the file when `cover_letter_path` already points to one, otherwise write and save it and record its path — then place it as below, text first.
+- Cover letter text (preferred): paste into the field's text box, or open its `Enter manually` / `Paste` / `Type` option beside the upload buttons and paste there. Paste the letter content as plain text. If the source is Markdown, remove Markdown headings only if they are formatting artifacts; preserve the letter text. If the source is PDF, extract the text before pasting.
+- Cover letter file upload (only when the field has no text option): upload the PDF when `cover_letter_path` points to one. If the cover letter is Markdown, create a simple PDF derivative next to the Markdown file and upload that derivative.
 - Country/location fields: use only the stable default current location unless the form is asking for target job location.
 - Work authorization, sponsorship, visa, notice period, salary, phone, street address, and demographic fields: use the wiki defaults when present; otherwise fill the rest of the form, leave it open, and ask the user for the missing value per the unknown-field blocker flow in SKILL.md.
-- Optional unknown fields: leave blank when the form allows it.
+- Optional unknown fields: leave blank when the form allows it. A cover-letter field is never in this category; it is always filled.
 - Equal-opportunity fields: prefer `Prefer not to answer` or equivalent when available and when the wiki does not define a more specific answer.
 
 ## Blockers

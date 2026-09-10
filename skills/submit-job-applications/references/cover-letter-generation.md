@@ -1,15 +1,15 @@
 # Cover-Letter Generation
 
-Cover letters are generated here, at apply time, not during triage. Generate one only when the application form actually asks for a cover letter (an upload field or a text box). Do not pre-generate letters for suitable rows whose forms never request one.
+Cover letters are generated here, at apply time, not during triage. Generate one whenever the application form has a cover-letter field — an upload field or a text box, required or optional. **Never leave a cover-letter field empty**; an optional field is filled exactly like a required one. Do not pre-generate letters for suitable rows whose forms have no cover-letter field.
 
 ## When To Generate, Reuse, Or Skip
 
 For a row whose form exposes a cover-letter field:
 
-1. If `cover_letter_path` is nonblank and the file exists, reuse it. Do not overwrite or regenerate it. Upload or paste that existing letter.
-2. Otherwise, generate a new letter following the rules below, validate it against the word band and quality bar before saving (revise until it passes — never save a letter that fails the band), save it locally, write its absolute path to `cover_letter_path` in the sheet immediately after saving, then upload or paste it.
+1. If `cover_letter_path` is nonblank and the file exists, reuse it. Do not overwrite or regenerate it. Place that existing letter per [Placing The Letter](#placing-the-letter).
+2. Otherwise, generate a new letter following the rules below, validate it against the word band and quality bar before saving (revise until it passes — never save a letter that fails the band), save it locally, write its absolute path to `cover_letter_path` in the sheet immediately after saving, then place it per [Placing The Letter](#placing-the-letter).
 
-If the form does not ask for a cover letter, do not generate one and leave `cover_letter_path` as it is.
+If the form has no cover-letter field at all, do not generate one and leave `cover_letter_path` as it is.
 
 Write the sheet path as soon as the letter is saved, even if the application is later blocked, left at the review gate, or not submitted. The saved file is kept regardless of the application outcome.
 
@@ -28,6 +28,15 @@ Save the Markdown letter under `cover_letters/<Country>/` at the repo root unles
 Use the filename `<Company>.md`, sanitized only for filesystem safety: keep the company spelling readable and close to the sheet value, replace path separators and unsafe characters, collapse repeated whitespace, and trim leading/trailing punctuation. Do not include the date, role, seniority, or long slugs. Avoid overwriting existing files; if the same company already has a different Markdown cover letter in that country folder, append a short numeric suffix such as `<Company>-2.md`.
 
 For example, a generated letter for Kamstrup in the Denmark tab is saved as `cover_letters/Denmark/Kamstrup.md` and stored in the sheet as its absolute path. Existing PDFs in a country folder are historical application artifacts; do not edit or rename them.
+
+## Placing The Letter
+
+Prefer writing the letter into the form over uploading a file:
+
+1. **Text first.** If the cover-letter field is a text box, or offers an `Enter manually` / `Paste` / `Type` option beside its upload buttons, open it and paste the letter as plain text — the Markdown content, or text extracted from the PDF when the stored letter is a PDF. Confirm the pasted text is complete through the signature.
+2. **File only when there is no text option.** Upload the PDF when `cover_letter_path` points to one. Otherwise create a same-basename PDF derivative next to the Markdown (`cover_letters/<Country>/<Company>.pdf`), upload it, and keep the Markdown as the sheet path. Use a PDF unless the field rejects it; the field's accepted types decide.
+
+Creating the PDF is mechanical. `reportlab` is not installed in the system Python or `.venv`. Headless Chrome works: render the Markdown paragraphs to a simple HTML file in the session scratchpad, then run `Google Chrome --headless=new --no-pdf-header-footer --user-data-dir=<scratchpad profile dir> --print-to-pdf=<target.pdf> file://<html>`. Chrome writes the PDF but may never exit, so run it in the background, wait for the file, check it ends in `%%EOF` and is one page, then stop that process only — match it by its scratchpad profile dir, never the user's Chrome.
 
 ## Evidence Handling
 
