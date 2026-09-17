@@ -139,6 +139,11 @@ TITLE_MISMATCH_KEYWORDS: tuple[str, ...] = (
 )
 TITLE_MISMATCH_REASON = "title missmatch"
 
+# job_status for roles found on a target company's own career page
+# (job_finder.career_pages). It counts as Suitable everywhere — availability
+# checks, applying, reporting — and triage leaves it alone.
+ULTRA_SUITABLE_VALUE = "⭐ Ultra Suitable"
+
 PROXIES: list[str] = _env_list("PROXIES", [])
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

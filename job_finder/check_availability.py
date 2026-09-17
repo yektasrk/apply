@@ -1,7 +1,7 @@
 """
 check_availability.py - Mark closed job rows in Google Sheets.
 
-Only rows whose job_status is Suitable are checked. Those are the jobs we intend
+Only rows whose job_status is Suitable (or ⭐ Ultra Suitable) are checked. Those are the jobs we intend
 to apply to, so their availability is the only availability that changes a
 decision. Untriaged rows are left alone until they are triaged, and not-suitable
 rows are on their way to the archive sheet.
@@ -58,7 +58,7 @@ DEFAULT_WRITE_BATCH_SIZE = 100
 # Untriaged rows are left alone until they are triaged, and not-suitable rows
 # are on their way to the archive sheet, so closing either one buys nothing and
 # costs an HTTP request per row.
-CHECKABLE_STATUSES = {"suitable"}
+CHECKABLE_STATUSES = {"suitable", config.ULTRA_SUITABLE_VALUE.lower()}
 
 CLOSED_PHRASES = (
     "no longer accepting applications",

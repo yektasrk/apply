@@ -66,7 +66,9 @@ if not os.path.isabs(SA_FILE):
 OUT_DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO_ROOT, ".report_tmp")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-TRIAGED = {"suitable", "not suitable", "yes"}
+# "⭐ ultra suitable" is set by job_finder.career_pages and counts as Suitable.
+SUITABLE = {"suitable", "yes", "⭐ ultra suitable"}
+TRIAGED = SUITABLE | {"not suitable"}
 KEEP = ("title", "company", "job_status", "suitability_reason", "job_level",
         "is_remote", "location", "scraped_at", "date_posted", "description", "job_url")
 
@@ -108,7 +110,7 @@ def month_of(row):
 
 def status_bucket(status):
     """Collapse the triage vocabulary to the two buckets the charts use."""
-    return "Suitable" if status.lower() in ("suitable", "yes") else "Not Suitable"
+    return "Suitable" if status.lower() in SUITABLE else "Not Suitable"
 
 
 def distinct(rows):
@@ -222,7 +224,7 @@ def main():
                 duplicates, timeline, month_basis)
 
     ns = [r for r in rows if r["job_status"].lower() == "not suitable" and r["suitability_reason"]]
-    su = [r for r in rows if r["job_status"].lower() in ("suitable", "yes") and r["suitability_reason"]]
+    su = [r for r in rows if r["job_status"].lower() in SUITABLE and r["suitability_reason"]]
     nsd, ns_dims = distinct(ns)
     sud, su_dims = distinct(su)
 

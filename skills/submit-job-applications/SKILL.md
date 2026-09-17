@@ -31,7 +31,7 @@ Refresh sheet metadata and headers before selecting rows. Seed up to six active 
 Select only rows where:
 
 - `job_url` is nonblank.
-- `job_status` is `Suitable`.
+- `job_status` is `Suitable` or `⭐ Ultra Suitable`. Fill `⭐ Ultra Suitable` rows first: they come from the target companies' own career pages.
 - `applied_at` is blank or missing.
 - `application_result` is blank, unless the user explicitly asks to retry rows with an existing result.
 

@@ -48,16 +48,23 @@ def _job_message_entry(job, number: int) -> str:
     return "\n".join(lines)
 
 
-def _message_page(entries: list[str], rows_written: int, page: int, total_pages: int) -> str:
+def _message_page(
+    entries: list[str],
+    rows_written: int,
+    page: int,
+    total_pages: int,
+    source_label: str = "",
+) -> str:
     now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
     country = telegram_bot.escape(config.LOCATION)
     flag = telegram_bot.location_flag(config.LOCATION)
     page_label = f" ({page}/{total_pages})" if total_pages > 1 else ""
+    source = f" · {telegram_bot.escape(source_label)}" if source_label else ""
     sheet_url = f"https://docs.google.com/spreadsheets/d/{config.GOOGLE_SHEET_ID}"
 
     return "\n".join(
         [
-            f"<b>{flag} {country}</b>{page_label}",
+            f"<b>{flag} {country}</b>{source}{page_label}",
             f"<b>{rows_written} new jobs</b> — {now}",
             "",
             f"<blockquote expandable>{chr(10).join(entries)}</blockquote>",
@@ -67,7 +74,7 @@ def _message_page(entries: list[str], rows_written: int, page: int, total_pages:
     )
 
 
-def build_messages(jobs, rows_written: int) -> list[str]:
+def build_messages(jobs, rows_written: int, source_label: str = "") -> list[str]:
     if rows_written == 0 or jobs.empty:
         return []
 
@@ -80,7 +87,7 @@ def build_messages(jobs, rows_written: int) -> list[str]:
 
     for entry in entries:
         candidate = current + [entry]
-        preview = _message_page(candidate, rows_written, 999, 999)
+        preview = _message_page(candidate, rows_written, 999, 999, source_label)
         if current and len(preview) > telegram_bot.MESSAGE_LIMIT:
             pages.append(current)
             current = [entry]
@@ -91,7 +98,7 @@ def build_messages(jobs, rows_written: int) -> list[str]:
 
     total_pages = len(pages)
     return [
-        _message_page(page_entries, rows_written, page, total_pages)
+        _message_page(page_entries, rows_written, page, total_pages, source_label)
         for page, page_entries in enumerate(pages, start=1)
     ]
 

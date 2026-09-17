@@ -7,7 +7,7 @@ description: Build a wiki report that aggregates across all triaged job rows in 
 
 ## Overview
 
-Aggregate every already-triaged job row (`job_status` of `Suitable`, legacy `Yes`,
+Aggregate every already-triaged job row (`job_status` of `Suitable`, `⭐ Ultra Suitable`, legacy `Yes`,
 or `Not Suitable`) across the sheet's country tabs into a single wiki report that
 answers:
 

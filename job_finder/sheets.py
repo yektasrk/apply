@@ -8,6 +8,7 @@ import logging
 import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
+from gspread.utils import rowcol_to_a1
 from tenacity import retry
 
 from . import config
@@ -99,6 +100,50 @@ def get_existing_urls(ws: gspread.Worksheet) -> set[str]:
     existing = {value.strip() for value in column if value.strip()}
     log.info("Found %d existing job URL(s) in sheet.", len(existing))
     return existing
+
+
+def company_title_key(company: object, title: object) -> str:
+    """Source-independent identity of a posting: company and title, alphanumerics only.
+
+    The same role reaches the sheet from LinkedIn and from the company's own
+    career page under two different URLs, so `job_url` alone cannot tell them
+    apart. Case, punctuation, and spacing differ between the two sources
+    ("Booking.com" / "booking com"), so only letters and digits are compared.
+    """
+    def normalise(value: object) -> str:
+        return "".join(ch for ch in str(value or "").casefold() if ch.isalnum())
+
+    return f"{normalise(company)}|{normalise(title)}"
+
+
+@retry(**RETRY_TRANSIENT)
+def read_company_title_keys(ws: gspread.Worksheet) -> set[str]:
+    """`company_title_key` for every row of a tab, fetching only those two columns."""
+    headers = [str(value).strip() for value in ws.row_values(1)]
+    if "company" not in headers or "title" not in headers:
+        return set()
+    letters = [
+        rowcol_to_a1(1, headers.index(name) + 1).rstrip("1")
+        for name in ("company", "title")
+    ]
+    companies, titles = ws.batch_get([f"{letter}2:{letter}" for letter in letters])
+    size = max(len(companies), len(titles))
+    keys = set()
+    for index in range(size):
+        company = companies[index][0] if index < len(companies) and companies[index] else ""
+        title = titles[index][0] if index < len(titles) and titles[index] else ""
+        if str(title).strip():
+            keys.add(company_title_key(company, title))
+    return keys
+
+
+def get_known_company_titles(ws: gspread.Worksheet) -> set[str]:
+    """`company_title_key`s already in this live tab or its archive tab."""
+    from . import archive
+
+    live = read_company_title_keys(ws)
+    archived = archive.get_archived_company_title_keys(tab_title=ws.title)
+    return live | archived
 
 
 def get_known_urls(ws: gspread.Worksheet) -> set[str]:
@@ -206,10 +251,17 @@ def _prepare_df(jobs: pd.DataFrame) -> pd.DataFrame:
     return df[SHEET_COLUMNS].fillna("").astype(str)
 
 
-def push_jobs(jobs: pd.DataFrame) -> tuple[int, int, pd.DataFrame]:
+def push_jobs(
+    jobs: pd.DataFrame,
+    dedup_company_title: bool = False,
+) -> tuple[int, int, pd.DataFrame]:
     """
     Append only new (non-duplicate) jobs to Google Sheets.
     Returns (rows_written, rows_skipped, new_jobs).
+
+    `dedup_company_title` also drops jobs whose company and title already
+    appear in the live or archive tab, for sources whose URLs differ from the
+    LinkedIn rows the tab already holds.
     """
     if jobs.empty:
         log.warning("No jobs to push.")
@@ -223,6 +275,10 @@ def push_jobs(jobs: pd.DataFrame) -> tuple[int, int, pd.DataFrame]:
 
     before = len(df)
     df = df[~df[DEDUP_COLUMN].isin(existing_urls)]
+    if dedup_company_title and not df.empty:
+        known_keys = get_known_company_titles(ws)
+        keys = [company_title_key(c, t) for c, t in zip(df["company"], df["title"])]
+        df = df[[key not in known_keys for key in keys]]
     skipped = before - len(df)
 
     if skipped:

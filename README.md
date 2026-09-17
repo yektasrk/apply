@@ -14,7 +14,7 @@ The tracked Python app lives in `job_finder/`. Personal material — CVs,
 
 ```text
 apply/
-├── job_finder/            # Scraping, dedupe, sheet writes, availability, cleanup
+├── job_finder/            # Scraping, career pages, dedupe, sheet writes, availability, cleanup
 ├── skills/                # Canonical tool-neutral agent skills (source of truth)
 ├── .codex/skills/         # Codex discovery mirror (symlinks into skills/)
 ├── .claude/skills/        # Claude discovery mirror (symlinks into skills/)
@@ -74,9 +74,9 @@ The availability checker scans configured country tabs by default; `--tab`,
 a row `Closed` on a recognized closed-posting signal, and flushes pending writes
 every `--write-batch-size` rows (default 100).
 
-**Only rows marked `Suitable` are checked**, because `job_status` has no separate
+**Only rows marked `Suitable` or `⭐ Ultra Suitable` are checked**, because `job_status` has no separate
 availability field — writing `Closed` overwrites whatever verdict was there, and
-`Suitable` is the only one worth replacing that way. A row is also skipped when
+those are the only ones worth replacing that way. A row is also skipped when
 its status is `Applied` or when `application_result` or `applied_at` is nonblank,
 so a real outcome is never buried under an availability result. Both protections
 hold under `--force`, which otherwise widens the scan to every row.
@@ -146,6 +146,61 @@ writing and `--limit` caps rows per tab.
 workflows address rows by absolute row number, and deleting rows shifts
 everything beneath.
 
+## Career Pages
+
+`job_finder/career_pages.py` checks a fixed list of companies' own career pages
+every 4 hours and appends matching roles to the Netherlands tab, alongside the
+LinkedIn rows. It never reads LinkedIn.
+
+```bash
+python -m job_finder.career_pages --country netherlands --dry-run
+python -m job_finder.career_pages --country netherlands --company "Booking.com" --dry-run
+python -m job_finder.career_pages --country netherlands
+```
+
+The companies and their sources live in `job_finder/company_boards.py`. Each
+entry names where the company's careers page gets its jobs:
+
+| `ats` | Read from |
+| --- | --- |
+| `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `workable`, `recruitee`, `personio`, `teamtailor`, `workday` | the public job-board feed behind the careers page, by `slug` (Workday also needs `extra.host` and `extra.site`) |
+| `homerun`, `bamboohr`, `join`, `rss` | smaller boards and plain RSS/Atom feeds (`rss` takes `extra.url`) |
+| `booking`, `capgemini`, `deloitte`, `optiver`, `gatsby` | a company's own jobs API, or a Gatsby site read from its sitemap |
+| `html` | a careers page the company hosts itself, read without a browser: `extra.url`, optional `extra.link_pattern`, `extra.json_key` and `extra.headers` for listings served as HTML inside JSON |
+| `unsupported` | no careers page readable without a browser; every run names it in the log instead of skipping it silently |
+
+`extra.nl_only` marks a source whose roles are all in the Netherlands even when
+a posting says only "Headquarters", "Remote", or nothing.
+
+A feed is preferred over the page's HTML because it is the same list the page
+shows, complete and structured, and it does not depend on JavaScript. To add a
+company, find the feed behind its careers page, check that it returns jobs, and
+add a `Board(...)`. Spell `company` as LinkedIn does, so the dedup below
+recognises a role LinkedIn already imported. `tests/test_career_pages.py`
+checks that every entry is well-formed.
+
+A role is kept when:
+
+- its title is in the SRE, platform, DevOps, infrastructure, cloud, or systems
+  engineering family (`TITLE_INCLUDE_KEYWORDS`);
+- it is not junior, an internship, or a manager or director role
+  (`TITLE_EXCLUDE_KEYWORDS`);
+- its location is in the Netherlands, or it is remote across Europe.
+
+The existing `TITLE_MISMATCH_KEYWORDS` pre-marking then applies as usual, and
+every role it does not mark `Not Suitable` is written as `⭐ Ultra Suitable`,
+skipping triage.
+
+Rows note their source in `application_notes`
+(`source: career page (<ats>)`). Dedup is stricter than for the LinkedIn
+scrape: on top of `job_url`, a role is skipped when the live or archive tab
+already has a row with the same company and title. That catches the same role
+imported from LinkedIn under a different URL.
+
+One failing company is logged and skipped. The run ends with a per-company
+table (jobs seen, matched, error) and exits non-zero when at least 30% of the
+boards fail, so a broken source turns the Actions run red.
+
 ## Sheet Status Contract
 
 Columns are defined in `job_finder/sheets.py`. The agent workflow uses these
@@ -153,12 +208,17 @@ fields consistently:
 
 | Column | Meaning |
 | --- | --- |
-| `job_status` | Suitability and lifecycle status: `Suitable`, `Not Suitable`, `Closed`, or `Applied` |
+| `job_status` | Suitability and lifecycle status: `Suitable`, `⭐ Ultra Suitable`, `Not Suitable`, `Closed`, or `Applied` |
 | `suitability_reason` | Sheet-visible explanation for a suitability decision |
 | `application_result` | Application outcome: `Resume Send` on confirmed submission, later `Resume Reject` or `Online Meeting` once reconciled from email |
 | `cover_letter_path` | Absolute path to the generated cover letter |
 | `applied_at` | Sheet-local timestamp written after a confirmed submission |
 | `application_notes` | Confirmation, blocker, or other application context |
+
+`⭐ Ultra Suitable` is written only by [Career Pages](#career-pages): a role on a
+target company's own careers page. It counts as `Suitable` for availability
+checks, applying (those rows go first), and reporting, and triage never
+re-decides it. It must be one of the `job_status` dropdown options in the sheet.
 
 A nonblank `application_result` means the row is already processed. A confirmed
 submission sets `job_status` to `Applied` and `application_result` to
@@ -175,6 +235,10 @@ so the filter decision stays visible.
 per-country UTC cron schedule defined in that file, and can be triggered manually
 with a `country` input. Each run resolves the country, then runs scraping and
 closed-job marking as parallel jobs.
+
+`.github/workflows/career-pages.yml` runs [Career Pages](#career-pages) at
+minute 15 of every fourth hour (UTC). A manual run takes optional `dry_run` and
+`company` inputs, and uses the same secrets as the scrape.
 
 Required secrets: `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON key content,
 written to `service_account.json` at runtime), `GOOGLE_SHEET_NAME`,

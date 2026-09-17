@@ -150,6 +150,19 @@ def get_archived_urls(tab_title: str | None = None) -> set[str]:
     return urls
 
 
+def get_archived_company_title_keys(tab_title: str) -> set[str]:
+    """`sheets.company_title_key` for every row archived under one country tab.
+
+    A country with nothing archived yet has no tab, which reads as an empty set.
+    """
+    spreadsheet = get_archive_spreadsheet()
+    keys: set[str] = set()
+    for ws in spreadsheet.worksheets():
+        if ws.title == tab_title:
+            keys.update(sheets.read_company_title_keys(ws))
+    return keys
+
+
 def _next_empty_row(ws: gspread.Worksheet, headers: list[str]) -> int:
     """First free row, measured by the `job_url` column.
 

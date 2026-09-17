@@ -26,6 +26,7 @@ Use the existing sheet semantics unless the user specifies a different sheet. Re
 - Status column: `job_status`
 - Suitable values: `Suitable`, plus legacy `Yes` from before this workflow standardized on `Suitable` (treat as already triaged suitable; do not re-triage or rewrite it)
 - Not-suitable value: `Not Suitable`
+- `⭐ Ultra Suitable`: written by the career-page watcher (`job_finder.career_pages`) for roles on a target company's own careers page. It is already decided and counts as suitable; never re-triage or rewrite it.
 - Terminal skip values in `job_status`: `Closed`, `Resume Send`, `Resume Reject`, or any user-defined applied/rejected state
 - Undecided values in `job_status`: blank, `FALSE`, `No`, or other non-terminal legacy placeholders
 - Outcome column: `application_result`; any nonblank value means skip the row
