@@ -34,6 +34,7 @@ import pandas as pd
 from tenacity import retry, retry_if_exception
 
 from . import config
+from . import fit
 from . import main as scrape_main
 from . import scraper
 from . import sheets
@@ -1083,11 +1084,42 @@ def to_frame(results: list[BoardResult]) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
     frame = pd.DataFrame(rows).drop_duplicates(subset=["job_url"], keep="first")
-    frame = scraper.mark_title_mismatches(frame)
-    # A title-mismatch verdict stands; every other role from a target company's
-    # own career page goes straight to the apply queue without triage.
-    frame.loc[frame["job_status"] == "", "job_status"] = config.ULTRA_SUITABLE_VALUE
-    return frame
+    return shortlist(scraper.mark_title_mismatches(frame))
+
+
+def shortlist(frame: pd.DataFrame) -> pd.DataFrame:
+    """Keep only the roles worth the user's attention (see job_finder.fit).
+
+    Strong fits become ⭐ Ultra Suitable and skip triage; borderline ones keep a
+    blank status so triage reads them in full; weak ones and title-rule
+    mismatches are not written at all, only logged.
+    """
+    kept = []
+    for _, job in frame.iterrows():
+        label = f"{job['company']}: {job['title']}"
+        if job.get("job_status") == "Not Suitable":
+            log.info("  skipped  %s — %s", label, job.get("suitability_reason", ""))
+            continue
+        verdict = fit.assess_fit(job["title"], job.get("description", ""))
+        if verdict.level == fit.WEAK:
+            log.info("  skipped  %s — %s", label, verdict.reason)
+            continue
+        job = job.copy()
+        if verdict.level == fit.STRONG:
+            job["job_status"] = config.ULTRA_SUITABLE_VALUE
+            job["suitability_reason"] = verdict.reason
+        else:
+            job["job_status"] = ""
+            job["application_notes"] = f"{job['application_notes']}; borderline, for triage: {verdict.reason}"
+        log.info("  %-8s %s", verdict.level, label)
+        kept.append(job)
+    log.info(
+        "Shortlist: %d strong, %d borderline, %d skipped.",
+        sum(j["job_status"] == config.ULTRA_SUITABLE_VALUE for j in kept),
+        sum(j["job_status"] == "" for j in kept),
+        len(frame) - len(kept),
+    )
+    return pd.DataFrame(kept) if kept else pd.DataFrame()
 
 
 def log_summary(results: list[BoardResult], unsupported: list[Board]) -> None:

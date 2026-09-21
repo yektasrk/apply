@@ -520,19 +520,42 @@ def test_failure_ratio_threshold():
     assert not cp.failure_ratio_exceeded([])
 
 
-def test_to_frame_notes_source_and_premarks_titles():
+STRONG_TEXT = (
+    "Run Kubernetes and Kafka on Linux. Build CI/CD, monitoring with Prometheus, "
+    "and automation in Go and Python. Join the on-call rotation."
+)
+
+
+def test_to_frame_shortlists_strong_borderline_and_drops_the_rest():
     result = cp.BoardResult(
         Board("Acme", "lever"),
         matched=[
-            cp._job(title="Platform Engineer", company="Acme", location="Amsterdam", job_url="u1"),
-            cp._job(title="Staff Platform Engineer", company="Acme", location="Amsterdam", job_url="u2"),
-            cp._job(title="Platform Engineer", company="Acme", location="Amsterdam", job_url="u1"),
+            cp._job(title="Platform Engineer", company="Acme", location="Amsterdam", job_url="u1",
+                    description=STRONG_TEXT),
+            cp._job(title="Staff Platform Engineer", company="Acme", location="Amsterdam", job_url="u2",
+                    description=STRONG_TEXT),
+            cp._job(title="Platform Engineer", company="Acme", location="Amsterdam", job_url="u1",
+                    description=STRONG_TEXT),
+            cp._job(title="Storage Engineer", company="Acme", location="Amsterdam", job_url="u3",
+                    description=STRONG_TEXT),
+            cp._job(title="DevOps Engineer", company="Acme", location="Amsterdam", job_url="u4",
+                    description="Vloeiend Nederlands is vereist. " + STRONG_TEXT),
         ],
     )
     frame = cp.to_frame([result])
-    assert frame["job_url"].tolist() == ["u1", "u2"]
-    assert set(frame["application_notes"]) == {"source: career page (lever)"}
-    assert frame["job_status"].tolist() == ["⭐ Ultra Suitable", "Not Suitable"]
+    assert frame["job_url"].tolist() == ["u1", "u3"]  # u2 title mismatch, u4 Dutch: not written
+    assert frame["job_status"].tolist() == ["⭐ Ultra Suitable", ""]
+    assert frame.iloc[0]["suitability_reason"].startswith("Core role; the description matches")
+    assert frame.iloc[0]["application_notes"] == "source: career page (lever)"
+    assert frame.iloc[1]["application_notes"].startswith("source: career page (lever); borderline, for triage: Title")
+
+
+def test_to_frame_empty_when_nothing_survives():
+    result = cp.BoardResult(
+        Board("Acme", "lever"),
+        matched=[cp._job(title="Windows DevOps Engineer", company="Acme", location="Amsterdam", job_url="u1")],
+    )
+    assert cp.to_frame([result]).empty
 
 
 def test_select_boards_splits_unsupported(monkeypatch):
@@ -624,3 +647,75 @@ def test_ultra_suitable_rows_get_availability_checks():
     assert check_availability._is_checkable("⭐ Ultra Suitable", force=False)
     assert check_availability._is_checkable(" Suitable ", force=False)
     assert not check_availability._is_checkable("Not Suitable", force=False)
+
+
+# ── Fit shortlist ───────────────────────────────────────────────────────────────
+
+from job_finder import fit  # noqa: E402
+
+
+def test_fit_strong_for_core_title_with_broad_overlap():
+    verdict = fit.assess_fit("Senior Site Reliability Engineer", STRONG_TEXT)
+    assert verdict.level == fit.STRONG
+    assert {"Kubernetes", "Kafka", "Linux", "Go", "Python", "On-call"} <= set(verdict.skills)
+
+
+@pytest.mark.parametrize(
+    "text, fragment",
+    [
+        ("You have a fluent command of Dutch and English. " + STRONG_TEXT, "Dutch"),
+        ("Goede beheersing van de Nederlandse taal. " + STRONG_TEXT, "Dutch"),
+        ("We are unable to offer visa sponsorship for this role. " + STRONG_TEXT, "sponsorship"),
+        ("Candidates need a valid security clearance. " + STRONG_TEXT, "clearance"),
+        ("You bring 10+ years of experience in infrastructure. " + STRONG_TEXT, "10+ years"),
+    ],
+)
+def test_fit_hard_blockers_are_weak(text, fragment):
+    verdict = fit.assess_fit("Platform Engineer", text)
+    assert verdict.level == fit.WEAK
+    assert fragment in verdict.reason
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Dutch is a plus.",
+        "Speaking Dutch is nice to have but not required.",
+        "Fluent Dutch is not a requirement.",
+    ],
+)
+def test_fit_optional_dutch_is_not_a_blocker(sentence):
+    assert fit.assess_fit("Platform Engineer", f"{sentence} {STRONG_TEXT}").level == fit.STRONG
+
+
+@pytest.mark.parametrize(
+    "title, text, concern",
+    [
+        ("Senior Storage Engineer", STRONG_TEXT, "Title is outside"),
+        ("Platform Engineer", "Kubernetes, Linux and Python.", "Overlap is thin"),
+        ("Platform Engineer", "You bring 8+ years of experience. " + STRONG_TEXT, "8+ years"),
+        ("Platform Engineer", "AWS AWS Azure GCP Azure. " + STRONG_TEXT, "AWS/Azure/GCP"),
+        ("(Senior) DevOps Data Engineer", STRONG_TEXT, "Title is outside"),
+        ("Platform Engineer", "", "No description"),
+    ],
+)
+def test_fit_borderline_cases(title, text, concern):
+    verdict = fit.assess_fit(title, text)
+    assert verdict.level == fit.BORDERLINE
+    assert concern in verdict.reason
+
+
+def test_fit_peripheral_title_needs_broad_overlap():
+    assert fit.assess_fit("Network Engineer", "Kubernetes, Linux and Python.").level == fit.WEAK
+    assert fit.assess_fit("Network Engineer", STRONG_TEXT).level == fit.BORDERLINE
+
+
+def test_fit_core_title_with_tool_light_description_goes_to_triage():
+    assert fit.assess_fit("Site Reliability Engineer", "Help our users; improve reliability.").level == fit.BORDERLINE
+    assert fit.assess_fit("System Engineer", "Help our users; improve reliability.").level == fit.WEAK
+
+
+def test_fit_matches_go_in_language_lists_but_not_the_verb():
+    assert "Go" in fit.resume_skills("Our code is in Java/Kotlin, Go, Python, and Ruby.")
+    assert "Go" not in fit.resume_skills("Ready to go, and go further?")
+    assert "CI/CD" in fit.resume_skills("Operating GitLab and TeamCity.")

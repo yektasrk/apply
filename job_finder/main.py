@@ -44,7 +44,8 @@ def _job_message_entry(job, number: int) -> str:
     if company:
         title_text = f"{title_text} at {telegram_bot.escape(company)}"
 
-    lines = [f"{number}. {flag} {title_text}"]
+    star = "⭐ " if job.get("job_status") == config.ULTRA_SUITABLE_VALUE else ""
+    lines = [f"{number}. {flag} {star}{title_text}"]
     return "\n".join(lines)
 
 

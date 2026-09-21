@@ -187,9 +187,18 @@ A role is kept when:
   (`TITLE_EXCLUDE_KEYWORDS`);
 - its location is in the Netherlands, or it is remote across Europe.
 
-The existing `TITLE_MISMATCH_KEYWORDS` pre-marking then applies as usual, and
-every role it does not mark `Not Suitable` is written as `⭐ Ultra Suitable`,
-skipping triage.
+Only the most suitable of those are written. `job_finder/fit.py` sorts each
+role by its title and description against the resume:
+
+| Level | When | Written as |
+| --- | --- | --- |
+| strong | core SRE/platform/DevOps title, the description names 5+ of the resume's skills, no concerns | `⭐ Ultra Suitable` with the matched skills as `suitability_reason`, skipping triage |
+| borderline | plausible but needs a read: peripheral title with broad overlap, thin overlap on a core title, 8-9 years, heavy AWS/Azure/GCP, or no description | blank status, `application_notes` says why, so triage decides |
+| weak | required Dutch, no visa sponsorship, a security clearance, 10+ years, or little overlap | not written; the run log names it and the reason |
+
+Roles the existing `TITLE_MISMATCH_KEYWORDS` rules reject are not written
+either. The rules are a shortlist, not a suitability judgment: when they are
+unsure, the role goes to triage rather than being starred or dropped.
 
 Rows note their source in `application_notes`
 (`source: career page (<ats>)`). Dedup is stricter than for the LinkedIn
@@ -215,8 +224,9 @@ fields consistently:
 | `applied_at` | Sheet-local timestamp written after a confirmed submission |
 | `application_notes` | Confirmation, blocker, or other application context |
 
-`⭐ Ultra Suitable` is written only by [Career Pages](#career-pages): a role on a
-target company's own careers page. It counts as `Suitable` for availability
+`⭐ Ultra Suitable` marks a role on a target company's own careers page that
+[Career Pages](#career-pages) shortlisted as a strong fit, or that triage found
+suitable among its borderline ones. It counts as `Suitable` for availability
 checks, applying (those rows go first), and reporting, and triage never
 re-decides it. It must be one of the `job_status` dropdown options in the sheet.
 
