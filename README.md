@@ -269,6 +269,7 @@ the skill directly.
 | `submit-job-applications` | Apply to suitable rows: fills forms with the Simplify extension first and completes the rest, uploads materials, writes a cover letter into every cover-letter field, stops at the final submit for review, records the outcome only after confirmation |
 | `gmail-job-application-reconcile` | Classify recent job-application email, sync defensible outcomes into `application_result`, and file the messages under the `Apply!` Gmail label |
 | `report-job-market` | Analyze triaged rows, rejection reasons, demanded skills, and learning gaps into `wiki/queries/job-market-fit-report.md`; never writes back to Sheets |
+| `write-referral-note` | Write the note a contact submits when referring the user: the referrer's honest voice, plain wording, and no phrases reused from the cover letter |
 | `wiki-read` | Answer questions from the local wiki with page citations, without modifying it |
 | `wiki-maintain` | Ingest a source or file a durable answer; updates pages, `wiki/index.md`, and the append-only `wiki/log.md` |
 | `wiki-evolve` | Audit links, frontmatter, provenance, orphans, and contradictions; records repairs in `wiki/meta/health.md` |

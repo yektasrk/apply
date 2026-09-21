@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Referral Note"
+  short_description: "Draft an honest, human referral note a contact can submit"
+  default_prompt: "Use $write-referral-note to write the note my contact will submit when referring me for this job."

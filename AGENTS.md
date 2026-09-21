@@ -14,12 +14,13 @@ Skills live canonically in `skills/` and are mirrored into `.codex/skills/` and 
 - `wiki-maintain`: ingest sources, file durable answers, and update wiki pages.
 - `wiki-evolve`: lint, repair, and improve the wiki schema or structure.
 
-Four more run the job-application pipeline over the Google Sheets described in `README.md`. They are not wiki skills, but they read wiki knowledge for answer defaults and one writes back into `wiki/queries/`:
+Five more run the job-application pipeline over the Google Sheets described in `README.md`. They are not wiki skills, but they read wiki knowledge for answer defaults and one writes back into `wiki/queries/`:
 
 - `triage-job-applications`: mark sheet rows `Suitable` / `Not Suitable` with a sheet-visible reason.
 - `submit-job-applications`: fill applications, write cover letters into `cover_letters/`, and record outcomes after a review gate.
 - `gmail-job-application-reconcile`: classify application email and sync defensible outcomes to the sheet.
 - `report-job-market`: aggregate triaged rows into `wiki/queries/job-market-fit-report.md`, overall and broken down per country and per month.
+- `write-referral-note`: write the note a contact submits when referring the user, in the referrer's honest voice and distinct from the cover letter; saved as `cover_letters/<Country>/<Company>-referral-note.md`.
 
 Each skill carries its own operational procedure. This file is the schema those procedures defer to: the directory contract, page conventions, and log format below.
 
