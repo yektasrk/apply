@@ -58,6 +58,7 @@ BOARDS: list[Board] = [
     # Every Bitvavo role is listed at "Headquarters", which is Amsterdam.
     Board("Bitvavo", "ashby", "bitvavo", {"nl_only": True}),
     Board("Douro Labs", "ashby", "dourolabs.xyz"),
+    Board("Fidamy", "ashby", "fidamy"),
     Board("Lightspeed Commerce", "ashby", "lightspeedhq"),
     Board("Mollie", "ashby", "mollie"),
     Board("Vio.com", "ashby", "vio"),
