@@ -30,18 +30,18 @@ def _build_title_pattern(keywords: tuple[str, ...]) -> re.Pattern[str]:
 
 TITLE_MISMATCH_PATTERN = _build_title_pattern(config.TITLE_MISMATCH_KEYWORDS)
 
-_original_get_job_details = LinkedIn._get_job_details
+_original_fetch_details = LinkedIn._fetch_details
 
 
-def _get_job_details_with_defaults(self: LinkedIn, job_id: str) -> dict:
+def _fetch_details_with_defaults(self: LinkedIn, job_id: str) -> dict:
     """Work around JobSpy returning None for optional LinkedIn text fields."""
-    details = _original_get_job_details(self, job_id)
+    details = _original_fetch_details(self, job_id)
     if details.get("job_level") is None:
         details["job_level"] = ""
     return details
 
 
-LinkedIn._get_job_details = _get_job_details_with_defaults
+LinkedIn._fetch_details = _fetch_details_with_defaults
 
 
 def mark_title_mismatches(jobs: pd.DataFrame) -> pd.DataFrame:
